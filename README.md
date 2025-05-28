@@ -60,13 +60,13 @@ currentUser.Match(
 Transforms the value if present, otherwise returns None.
 
 ```csharp
-Option<string> productCode = Option.Some("abc123");
-Option<string> upperCaseCode = productCode.Map(code => code.ToUpper());
-// Result: Some("ABC123")
+Option<string> userInput = GetUserInput();
+Option<int> inputLength = userInput.Map(input => input.Length);
 
-Option<string> missingCode = Option.None;
-Option<string> transformedMissing = missingCode.Map(code => code.ToUpper());
-// Result: None
+// Chain transformations
+Option<decimal> price = Option.Some("29.99");
+Option<decimal> tax = price.Map(p => decimal.Parse(p))
+                           .Map(p => p * 0.08m);
 ```
 
 #### `Bind<T2>(Func<T, Option<T2>> binder)`
@@ -97,11 +97,17 @@ Option<int> filteredAge = validAge.Where(age => age >= 18);
 #### LINQ Support
 
 ```csharp
-var result = from user in GetUser(userId)
-             from profile in GetUserProfile(user.Id)
-             from preferences in GetUserPreferences(user.Id)
-             where CanBeSummarized(preferences)
-             select new UserSummary(user, profile, preferences);
+// Combine multiple optional values
+var orderSummary =
+    from userId in GetCurrentUserId()
+    from user in FindUser(userId)
+    from cart in GetUserCart(user.Id)
+    select $"Order for {user.Name}: {cart.ItemCount} items";
+
+orderSummary.Match(
+    summary => Console.WriteLine(summary),
+    () => Console.WriteLine("Unable to create order summary")
+);
 ```
 
 #### `IfNone<T>(Func<T> defaultProvider)`
@@ -185,42 +191,39 @@ orderResult.Match(
 Transforms the success value, otherwise preserves the error.
 
 ```csharp
-Result<string> productCode = Result.Success("abc123");
-Result<string> upperCode = productCode.Map(code => code.ToUpper());
-// Result: Success("ABC123")
+Result<string> userInput = ValidateInput(request);
+Result<UserCommand> command = userInput.Map(input => ParseCommand(input));
 
-Result<string> errorCode = Result.Error<string>(Error.From("Not found"));
-Result<string> transformedError = errorCode.Map(code => code.ToUpper());
-// Result: Error("Not found")
+// Transform errors are preserved
+Result<string> invalidInput = Result.Error<string>(Error.From("Invalid format"));
+Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input));
+// Result: Error("Invalid format")
 ```
 
 #### `Bind<T2>(Func<T, Result<T2>> binder)`
 Chains operations that return Results, allowing for sequential error handling.
 
 ```csharp
-Result<string> userInput = Result.Success("12345");
-Result<decimal> finalResult = userInput
-    .Bind(input => ValidateInput(input))
-    .Bind(validated => ParseDecimal(validated))
-    .Bind(parsed => ApplyBusinessRules(parsed));
-
-static Result<string> ValidateInput(string input) =>
-    input.Length > 0 ? Result.Success(input) : Result.Error<string>(Error.From("Input cannot be empty"));
-
-static Result<decimal> ParseDecimal(string input) =>
-    decimal.TryParse(input, out var result) 
-        ? Result.Success(result) 
-        : Result.Error<decimal>(Error.From("Invalid number format"));
+// Chain validation and processing steps
+Result<Payment> paymentResult =
+    Result.Success(orderRequest)
+          .Bind(req => PaymentGateway.Validate(req))
+          .Bind(valid => PaymentGateway.Charge(valid));
 ```
 
 #### LINQ Support
 
 ```csharp
-// Query syntax
-var result = from user in AuthenticateUser(credentials)
-             from permissions in GetUserPermissions(user.Id)
-             from session in CreateSession(user, permissions)
-             select new AuthenticatedSession(session, user);
+// Chain operations with automatic error handling
+var result = from request in ValidateRequest(httpRequest)
+             from user in AuthenticateUser(request.Token)
+             from data in FetchUserData(user.Id)
+             select new ApiResponse(data);
+
+result.Match(
+    response => SendResponse(response),
+    error => SendErrorResponse(error)
+);
 ```
 
 #### `IfError<T>(Func<Error, T> errorHandler)`
@@ -300,43 +303,39 @@ notification.Match(
 Transforms the right value, otherwise preserves the left value.
 
 ```csharp
-Either<ManualInput, AutoDetected> userChoice = Either.Right<ManualInput, AutoDetected>(new AutoDetected("192.168.1.1"));
-Either<ManualInput, string> formatted = userChoice.Map(auto => $"Auto-detected: {auto.Value}");
-// Result: Right("Auto-detected: 192.168.1.1")
+Either<ErrorMessage, UserData> userData = LoadUserData(userId);
+Either<ErrorMessage, string> displayName = userData.Map(data => data.FullName);
 
-Either<ManualInput, AutoDetected> manualChoice = Either.Left<ManualInput, AutoDetected>(new ManualInput("10.0.0.1"));
-Either<ManualInput, string> transformedManual = manualChoice.Map(auto => $"Auto-detected: {auto.Value}");
-// Result: Left(ManualInput("10.0.0.1"))
+// Left values are preserved unchanged
+Either<ErrorMessage, UserData> errorCase = Either.Left<ErrorMessage, UserData>(new ErrorMessage("Not found"));
+Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName);
+// Result: Left(ErrorMessage("Not found"))
 ```
 
 #### `Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
 Chains operations that return Either values.
 
 ```csharp
-Either<OfflineMode, OnlineMode> connectionState = Either.Right<OfflineMode, OnlineMode>(new OnlineMode(apiClient));
-Either<OfflineMode, SyncedData> result = connectionState
-    .Bind(online => FetchFromServer(online))
-    .Bind(data => ValidateServerData(data));
+// Try local cache then fallback to remote
+Either<CacheMiss, Product> productSrc =
+    Cache.TryGet(productId)
+         .MapRight<Product>(p => p)
+         .IfLeft(_ => RemoteApi.FetchProduct(productId));
 
-static Either<OfflineMode, ServerData> FetchFromServer(OnlineMode online) =>
-    online.IsConnected 
-        ? Either.Right<OfflineMode, ServerData>(online.FetchData())
-        : Either.Left<OfflineMode, ServerData>(new OfflineMode("Connection lost"));
-
-static Either<OfflineMode, SyncedData> ValidateServerData(ServerData data) =>
-    data.IsValid
-        ? Either.Right<OfflineMode, SyncedData>(new SyncedData(data))
-        : Either.Left<OfflineMode, SyncedData>(new OfflineMode("Invalid server data"));
+productSrc.Match(
+    _       => Console.WriteLine("Loaded from cache"),
+    product => Console.WriteLine($"Fetched {product.Name} from API")
+);
 ```
 
 #### LINQ Support
 
 ```csharp
-// Query syntax for processing different content types
-var result = from content in ParseContent(inputData)
-             from processed in ProcessByType(content)
-             from validated in ValidateFormat(processed)
-             select new ProcessedContent(validated);
+// Process data from different sources
+var result = from source in DetermineDataSource(config)
+             from data in LoadFromSource(source)
+             from processed in ProcessData(data)
+             select new ProcessedResult(processed);
 ```
 
 #### `IfLeft<TRight>(Func<TLeft, TRight> leftHandler)`
@@ -409,10 +408,7 @@ Gets all error messages as an immutable set.
 
 ```csharp
 Error error = Error.From("Error 1", "Error 2");
-foreach (string message in error.Messages)
-{
-    Console.WriteLine($"Error: {message}");
-}
+error.Messages.Iter(message => Console.WriteLine($"Error: {message}"));
 ```
 
 #### `ToException()`
@@ -463,18 +459,34 @@ Option<int> firstNumber = numbers.Head(); // Returns None instead of throwing
 Applies a function to each element and returns only the successful transformations.
 
 ```csharp
-string[] userInputs = { "123", "abc", "456", "def" };
-IEnumerable<int> validNumbers = userInputs.Choose(input => 
-    int.TryParse(input, out var number) 
-        ? Option.Some(number) 
-        : Option.None
-);
-// Result: [123, 456]
+// Parse valid integers from mixed input
+string[] inputs = { "42", "invalid", "100", "", "7" };
+var validNumbers = inputs.Choose(input => 
+    int.TryParse(input, out var number) ? Option.Some(number) : Option.None);
 
-List<string> fileNames = GetAllFileNames();
-IEnumerable<FileInfo> validFiles = fileNames.Choose(fileName =>
-    File.Exists(fileName) ? Option.Some(new FileInfo(fileName)) : Option.None
+validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}"));
+// Output: 42, 100, 7
+```
+
+#### `Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
+Applies an operation returning a `Result<T2>` to each element, aggregates successes or combines errors.
+
+```csharp
+// Validate all user inputs - succeeds only if all are valid
+string[] userInputs = { "john@email.com", "jane@email.com", "bob@email.com" };
+Result<ImmutableArray<Email>> validatedEmails = userInputs.Traverse(
+    input => ValidateEmail(input),
+    CancellationToken.None
 );
+// Result: Success([john@email.com, jane@email.com, bob@email.com])
+
+// If any validation fails, collect all errors
+string[] mixedInputs = { "john@email.com", "invalid-email", "jane@email.com", "bad-format" };
+Result<ImmutableArray<Email>> failedValidation = mixedInputs.Traverse(
+    input => ValidateEmail(input),
+    CancellationToken.None
+);
+// Result: Error("Invalid email: invalid-email", "Invalid email: bad-format")
 ```
 
 #### `Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
@@ -536,17 +548,38 @@ firstEntry.Match(
 Applies a function to each element and returns only the successful transformations.
 
 ```csharp
-IAsyncEnumerable<string> dataStream = GetDataStreamAsync();
-IAsyncEnumerable<ProcessedData> validData = dataStream.Choose(raw =>
-    TryParseData(raw, out var processed) 
-        ? Option.Some(processed) 
+// Filter and transform streaming data
+IAsyncEnumerable<string> logLines = ReadLogFileAsync("app.log");
+IAsyncEnumerable<LogEntry> validEntries = logLines.Choose(line => 
+    TryParseLogEntry(line, out var entry) 
+        ? Option.Some(entry) 
         : Option.None
 );
 
-await foreach (ProcessedData data in validData)
-{
-    Console.WriteLine($"Processed: {data}");
-}
+await validEntries.IterTask(async entry => {
+    if (entry.Level == LogLevel.Error)
+    {
+        await NotifyAdmins(entry);
+    }
+}, Option.None, CancellationToken.None);
+```
+
+#### `Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`
+Applies an async operation returning `ValueTask<Result<T2>>` to each element, aggregates successes or combines errors.
+
+```csharp
+// Validate file uploads asynchronously
+IAsyncEnumerable<UploadedFile> fileStream = GetUploadedFiles();
+Result<ImmutableArray<ValidatedFile>> validationResult =
+    await fileStream.Traverse(
+        async file => await ValidateFileAsync(file),
+        CancellationToken.None
+    );
+
+validationResult.Match(
+    validFiles => Console.WriteLine($"All {validFiles.Length} files are valid"),
+    errors => Console.WriteLine($"Validation failed: {errors}")
+);
 ```
 
 #### `IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
@@ -570,19 +603,30 @@ await records.IterTask(
 Safely retrieves a value from a dictionary, returning an Option.
 
 ```csharp
-Dictionary<string, User> userCache = GetUserCache();
-Option<User> user = userCache.Find("user123");
+Dictionary<string, DatabaseConnection> connectionPool = GetConnectionPool();
+Option<DatabaseConnection> connection = connectionPool.Find("primary");
 
-user.Match(
-    foundUser => Console.WriteLine($"Found: {foundUser.Name}"),
-    () => Console.WriteLine("User not in cache")
+connection.Match(
+    conn => ExecuteQuery(conn, sql),
+    () => Console.WriteLine("Primary connection not available")
 );
 
-// Chain operations safely
+// Safe configuration lookup with fallback
+Dictionary<string, string> appSettings = LoadAppSettings();
+string environment = appSettings.Find("Environment").IfNone(() => "Development");
+```
+
+#### `Find<TKey, TValue>(TKey key, Func<TValue> defaultProvider)`
+Safely retrieves a value or provides a default.
+
+```csharp
+// Configuration with smart defaults
 Dictionary<string, string> config = LoadConfiguration();
-Option<int> portNumber = config
-    .Find("server:port")
-    .Bind(portString => int.TryParse(portString, out var port) 
-        ? Option.Some(port) 
-        : Option.None);
+int timeout = config.Find("RequestTimeoutSeconds")
+                    .Bind(value => int.TryParse(value, out var parsed) 
+                        ? Option.Some(parsed) 
+                        : Option.None)
+                    .IfNone(() => 30);
+
+string logLevel = config.Find("LogLevel").IfNone(() => "Information");
 ```

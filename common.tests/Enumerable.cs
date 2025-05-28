@@ -83,6 +83,44 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void Traverse_with_all_success_returns_success_with_expected_array()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            var f = (int x) => Result.Success(x);
+            var result = array.Traverse(f, CancellationToken.None);
+            result.Should().BeSuccess().Which.Should().BeEquivalentTo(array);
+        });
+    }
+
+    [Fact]
+    public void Traverse_with_errors_returns_error_with_combined_messages()
+    {
+        var gen = from array in Gen.Int.Array
+                  where array.Length > 2
+                  from errorCount in Gen.Int[1, array.Length]
+                  from errorIndices in Gen.Shuffle(Enumerable.Range(0, array.Length - 1).ToList(), errorCount)
+                  select (array, errorIndices.ToImmutableHashSet());
+
+        gen.Sample(x =>
+        {
+            var (array, errorIndices) = x;
+            var indexedArray = array.Select((value, index) => (value, index));
+
+            var f = ((int value, int index) x) =>
+                errorIndices.Contains(x.index)
+                    ? Result.Error<int>(Error.From($"error:{x.index}"))
+                    : Result.Success(x.value);
+
+            var result = indexedArray.Traverse(f, CancellationToken.None);
+
+            result.Should().BeError().Which.Messages.Should().HaveSameCount(errorIndices);
+        });
+    }
+
+    [Fact]
     public void Iter_calls_action_for_each_element()
     {
         var gen = from array in Gen.Int.Array
@@ -325,83 +363,45 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task Iter_calls_action_for_each_element()
+    public async Task Traverse_with_all_success_returns_success_with_expected_array()
     {
-        var gen = from array in Gen.Int.Array
-                  let maxDegreesOfParallelismGen = Gen.OneOf(Gen.Const(-1), Gen.Int[1, array.Length + 1])
-                  from maxDegreesOfParallelism in Generator.GenerateOption(maxDegreesOfParallelismGen)
-                  select (array.ToAsyncEnumerable(), maxDegreesOfParallelism);
+        var gen = Gen.Int.Array;
 
-        await gen.SampleAsync(async x =>
+        await gen.SampleAsync(async array =>
         {
-            var (array, maxDegreesOfParallelism) = x;
-            var addedItems = ImmutableArray.Create<int>();
+            var asyncEnumerable = array.ToAsyncEnumerable();
+            var f = (int x) => ValueTask.FromResult(Result.Success(x));
 
-            await array.Iter(x => ImmutableInterlocked.Update(ref addedItems, items => items.Add(x)),
-                             maxDegreesOfParallelism,
-                             CancellationToken.None);
+            var result = await asyncEnumerable.Traverse(f, CancellationToken.None);
 
-            var expected = await array.ToArrayAsync();
-            addedItems.Should().BeEquivalentTo(expected);
+            result.Should().BeSuccess().Which.Should().BeEquivalentTo(array);
         });
     }
 
     [Fact]
-    public async Task Iter_with_cancellation_token_respects_cancellation()
+    public async Task Traverse_with_errors_returns_error_with_combined_messages()
     {
         var gen = from array in Gen.Int.Array
                   where array.Length > 2
-                  from cancelAfter in Gen.Int[1, array.Length - 1]
-                  select (array.ToAsyncEnumerable(), cancelAfter);
+                  from errorCount in Gen.Int[1, array.Length]
+                  from errorIndices in Gen.Shuffle(Enumerable.Range(0, array.Length - 1).ToList(), errorCount)
+                  select (array, errorIndices.ToImmutableHashSet());
 
         await gen.SampleAsync(async x =>
         {
-            var (array, cancelAfter) = x;
-            using var cancellationTokenSource = new CancellationTokenSource();
-            var callCount = 0;
+            var (array, errorIndices) = x;
+            var indexedArray = array.Select((value, index) => (value, index));
+            var asyncEnumerable = indexedArray.ToAsyncEnumerable();
 
-            Func<Task> f = async () => await array.Iter(x =>
-            {
-                callCount++;
-                if (callCount > cancelAfter)
-                {
-                    cancellationTokenSource.Cancel();
-                }
-            }, maxDegreeOfParallelism: 1, cancellationTokenSource.Token);
+            var f = ((int value, int index) x) =>
+                ValueTask.FromResult(
+                    errorIndices.Contains(x.index)
+                        ? Result.Error<int>(Error.From($"error:{x.index}"))
+                        : Result.Success(x.value));
 
-            await f.Should().ThrowAsync<OperationCanceledException>();
-            callCount.Should().BeGreaterThanOrEqualTo(cancelAfter);
-        });
-    }
+            var result = await asyncEnumerable.Traverse(f, CancellationToken.None);
 
-    [Fact]
-    public async Task Iter_with_max_degree_of_parallelism_limits_parallelism()
-    {
-        var gen = from array in Gen.Int.Array
-                  from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1]
-                  select (array.ToAsyncEnumerable(), maxDegreesOfParallelism);
-
-        await gen.SampleAsync(async x =>
-        {
-            var (array, maxDegreesOfParallelism) = x;
-            var iterations = 0;
-
-#pragma warning disable CA1031 // Do not catch general exception types
-            try
-            {
-                await array.Iter(_ =>
-                {
-                    iterations++;
-                    throw new InvalidOperationException();
-                }, maxDegreesOfParallelism, CancellationToken.None);
-            }
-            catch (Exception)
-            {
-            }
-#pragma warning restore CA1031 // Do not catch general exception types
-
-            // Ensure that the number of iterations did not exceed the max degree of parallelism
-            iterations.Should().BeLessThanOrEqualTo(maxDegreesOfParallelism);
+            result.Should().BeError().Which.Messages.Should().HaveSameCount(errorIndices);
         });
     }
 

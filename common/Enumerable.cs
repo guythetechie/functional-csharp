@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading;
@@ -28,6 +29,20 @@ public static class EnumerableExtensions
         source.Select(selector)
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
+
+    public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
+    {
+        var results = new List<T2>();
+        var errors = new List<Error>();
+
+        source.Iter(item => selector(item).Match(results.Add, errors.Add),
+                    maxDegreeOfParallelism: 1,
+                    cancellationToken);
+
+        return errors.Count > 0
+                ? errors.Aggregate((first, second) => first + second)
+                : Result.Success(results.ToImmutableArray());
+    }
 
     public static void Iter<T>(this IEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
@@ -68,14 +83,23 @@ public static class AsyncEnumerableExtensions
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
 
-    public static async ValueTask Iter<T>(this IAsyncEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken) =>
+    public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
+    {
+        var results = new List<T2>();
+        var errors = new List<Error>();
+
         await source.IterTask(async item =>
                               {
-                                  action(item);
-                                  await ValueTask.CompletedTask;
+                                  var result = await selector(item);
+                                  result.Match(results.Add, errors.Add);
                               },
-                              maxDegreeOfParallelism,
+                              maxDegreeOfParallelism: 1,
                               cancellationToken);
+
+        return errors.Count > 0
+                ? errors.Aggregate((first, second) => first + second)
+                : Result.Success(results.ToImmutableArray());
+    }
 
     public static async ValueTask IterTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
