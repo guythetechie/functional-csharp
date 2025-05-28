@@ -15,23 +15,29 @@ public sealed record Option<T>
 #pragma warning restore CA1716 // Identifiers should not match keywords
 {
     private readonly T? value;
+    private readonly bool isSome;
 
-    private Option(T? value)
+    private Option()
     {
-        this.value = value;
+        isSome = false;
     }
 
-    public bool IsNone =>
-        value is null;
+    private Option(T value)
+    {
+        this.value = value;
+        isSome = true;
+    }
 
-    public bool IsSome => !IsNone;
+    public bool IsNone => !isSome;
+
+    public bool IsSome => isSome;
 
 #pragma warning disable CA1000 // Do not declare static members on generic types
-    public static Option<T> Some(T value) =>
+    internal static Option<T> Some(T value) =>
         new(value);
 
     public static Option<T> None() =>
-        new(default(T?));
+        new();
 #pragma warning restore CA1000 // Do not declare static members on generic types
 
     public override string ToString() =>
@@ -121,6 +127,10 @@ public static class Option
     public static void Iter<T>(this Option<T> option, Action<T> f) =>
         option.Match(f,
                      () => { });
+
+    public static T IfNoneThrow<T>(this Option<T> option, Exception exception) =>
+        option.Match(t => t,
+                     () => throw exception);
 
     public static async ValueTask IterTask<T>(this Option<T> option, Func<T, ValueTask> f) =>
         await option.Match<ValueTask>(async t => await f(t),
