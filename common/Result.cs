@@ -85,6 +85,10 @@ public static class Result
         result.Match(value => Success(f(value)),
                      error => Error<T2>(error));
 
+    public static Result<T> MapError<T>(this Result<T> result, Func<Error, Error> f) =>
+        result.Match(value => Success(value),
+                     error => Error<T>(f(error))); 
+
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
         result.Match(value => f(value),
                      error => Error<T2>(error));

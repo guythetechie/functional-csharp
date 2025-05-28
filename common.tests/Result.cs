@@ -113,6 +113,36 @@ public class ResultTests
     }
 
     [Fact]
+    public void MapError_with_success_returns_success_value()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(successValue =>
+        {
+            var result = Result.Success(successValue);
+            var mapped = result.MapError(_ => Error.From("Some error"));
+
+            mapped.Should().BeSuccess().Which.Should().Be(successValue);
+        });
+    }
+
+    [Fact]
+    public void MapError_with_error_applies_function()
+    {
+        var gen = from errorResult in Generator.GenerateErrorResult<int>()
+                  from newError in Generator.Error
+                    select (errorResult, newError);
+
+        gen.Sample(x =>
+        {
+            var (errorResult, newError) = x;
+            var result = errorResult.MapError(_ => newError);
+
+            result.Should().BeError().Which.Should().Be(newError);
+        });
+    }
+
+    [Fact]
     public void Bind_with_error_returns_original_error()
     {
         var gen = from error in Generator.Error

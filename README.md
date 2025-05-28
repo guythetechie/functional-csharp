@@ -66,7 +66,7 @@ Option<int> inputLength = userInput.Map(input => input.Length);
 // Chain transformations
 Option<decimal> price = Option.Some("29.99");
 Option<decimal> tax = price.Map(p => decimal.Parse(p))
-                           .Map(p => p * 0.08m);
+                           .Map(p => p * 0.08m); // Some(2.3992m)
 ```
 
 #### `Bind<T2>(Func<T, Option<T2>> binder)`
@@ -77,8 +77,10 @@ Option<string> userId = Option.Some("123");
 Option<User> user = userId.Bind(id => FindUserById(id));
 Option<string> userEmail = user.Bind(u => GetUserEmail(u.Id));
 
-static Option<User> FindUserById(string id) => 
-    id == "123" ? Option.Some(new User("John")) : Option.None;
+static Option<User> FindUserById(string id) =>
+    id == "123"
+        ? Option.Some(new User("John"))
+        : Option.None;
 ```
 
 #### `Where(Func<T, bool> predicate)`
@@ -86,12 +88,10 @@ Filters the option based on a predicate. Returns None if there is no value, or i
 
 ```csharp
 Option<int> userAge = Option.Some(17);
-Option<int> adultAge = userAge.Where(age => age >= 18);
-// Result: None (17 is less than 18)
+Option<int> adultAge = userAge.Where(age => age >= 18) // None (17 is less than 18)
 
 Option<int> validAge = Option.Some(25);
-Option<int> filteredAge = validAge.Where(age => age >= 18);
-// Result: Some(25)
+Option<int> filteredAge = validAge.Where(age => age >= 18); // Some(25)
 ```
 
 #### LINQ Support
@@ -196,8 +196,21 @@ Result<UserCommand> command = userInput.Map(input => ParseCommand(input));
 
 // Transform errors are preserved
 Result<string> invalidInput = Result.Error<string>(Error.From("Invalid format"));
-Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input));
-// Result: Error("Invalid format")
+Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input)); // Error("Invalid format")
+```
+
+#### `MapError<T>(Func<Error, Error> mapper)`
+Transforms the error if the result is in error; otherwise preserves the success value.
+
+```csharp
+// Success values are preserved unchanged
+Result<User> successResult = Result.Success(new User("Alice"));
+Result<User> unchangedSuccess = successResult.MapError(error => Error.From("Won't be called")); // Success(User("Alice"))
+
+// Error transformation with context
+Result<ConfigFile> configResult = LoadConfig("settings.json");
+Result<ConfigFile> contextualError = configResult.MapError(error =>
+    error + Error.From($"Failed to load configuration from settings.json"));
 ```
 
 #### `Bind<T2>(Func<T, Result<T2>> binder)`
@@ -239,8 +252,7 @@ Throws an exception when the result is an error.
 
 ```csharp
 Result<DatabaseConnection> connectionResult = ConnectToDatabase();
-DatabaseConnection connection = connectionResult.IfErrorThrow();
-// Throws if connection failed
+DatabaseConnection connection = connectionResult.IfErrorThrow(); // Throws if connection failed
 ```
 
 #### `Iter(Action<T> action)`
@@ -269,7 +281,7 @@ Represents a value that can be one of two types. Useful for representing alterna
 // Creating Left values
 Either<LocalFile, RemoteFile> localSource = Either.Left<LocalFile, RemoteFile>(new LocalFile("./data.json"));
 
-// Creating Right values  
+// Creating Right values
 Either<LocalFile, RemoteFile> remoteSource = Either.Right<LocalFile, RemoteFile>(new RemoteFile("https://api.example.com/data"));
 
 // Using static methods
@@ -308,8 +320,7 @@ Either<ErrorMessage, string> displayName = userData.Map(data => data.FullName);
 
 // Left values are preserved unchanged
 Either<ErrorMessage, UserData> errorCase = Either.Left<ErrorMessage, UserData>(new ErrorMessage("Not found"));
-Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName);
-// Result: Left(ErrorMessage("Not found"))
+Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName); // Left(ErrorMessage("Not found"))
 ```
 
 #### `Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
@@ -399,8 +410,7 @@ Combines multiple errors into a single error.
 ```csharp
 Error emailError = Error.From("Invalid email format");
 Error passwordError = Error.From("Password too weak");
-Error combinedError = emailError + passwordError;
-// Result: Error with both messages
+Error combinedError = emailError + passwordError; // Error with both messages: "Invalid email format", "Password too weak"
 ```
 
 #### `Messages`
@@ -416,20 +426,17 @@ Converts the error to an appropriate exception.
 
 ```csharp
 Error singleError = Error.From("Database connection failed");
-Exception singleException = singleError.ToException();
-// Returns: InvalidOperationException
+Exception singleException = singleError.ToException(); // InvalidOperationException with message "Database connection failed"
 
 Error multipleErrors = Error.From("Error 1", "Error 2");
-Exception aggregateException = multipleErrors.ToException();
-// Returns: AggregateException containing multiple InvalidOperationExceptions
+Exception aggregateException = multipleErrors.ToException(); // AggregateException containing multiple InvalidOperationExceptions
 ```
 
 #### Exceptional Errors
 
 ```csharp
 var fileError = Error.From(new FileNotFoundException("settings.json"));
-Exception originalException = fileError.ToException();
-// Returns the original FileNotFoundException, not a wrapped exception
+Exception originalException = fileError.ToException(); // The original FileNotFoundException, not a wrapped exception
 ```
 
 ---
@@ -452,7 +459,7 @@ firstCustomer.Match(
 
 // Safe alternative to .First()
 int[] numbers = { };
-Option<int> firstNumber = numbers.Head(); // Returns None instead of throwing
+Option<int> firstNumber = numbers.Head(); // None (instead of throwing an exception)
 ```
 
 #### `Choose<T, T2>(Func<T, Option<T2>> selector)`
@@ -461,11 +468,10 @@ Applies a function to each element and returns only the successful transformatio
 ```csharp
 // Parse valid integers from mixed input
 string[] inputs = { "42", "invalid", "100", "", "7" };
-var validNumbers = inputs.Choose(input => 
+var validNumbers = inputs.Choose(input =>
     int.TryParse(input, out var number) ? Option.Some(number) : Option.None);
 
-validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}"));
-// Output: 42, 100, 7
+validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Output: 42, 100, 7
 ```
 
 #### `Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
@@ -477,16 +483,14 @@ string[] userInputs = { "john@email.com", "jane@email.com", "bob@email.com" };
 Result<ImmutableArray<Email>> validatedEmails = userInputs.Traverse(
     input => ValidateEmail(input),
     CancellationToken.None
-);
-// Result: Success([john@email.com, jane@email.com, bob@email.com])
+); // Success([john@email.com, jane@email.com, bob@email.com])
 
 // If any validation fails, collect all errors
 string[] mixedInputs = { "john@email.com", "invalid-email", "jane@email.com", "bad-format" };
 Result<ImmutableArray<Email>> failedValidation = mixedInputs.Traverse(
     input => ValidateEmail(input),
     CancellationToken.None
-);
-// Result: Error("Invalid email: invalid-email", "Invalid email: bad-format")
+); // Error("Invalid email: invalid-email", "Invalid email: bad-format")
 ```
 
 #### `Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
@@ -550,9 +554,9 @@ Applies a function to each element and returns only the successful transformatio
 ```csharp
 // Filter and transform streaming data
 IAsyncEnumerable<string> logLines = ReadLogFileAsync("app.log");
-IAsyncEnumerable<LogEntry> validEntries = logLines.Choose(line => 
-    TryParseLogEntry(line, out var entry) 
-        ? Option.Some(entry) 
+IAsyncEnumerable<LogEntry> validEntries = logLines.Choose(line =>
+    TryParseLogEntry(line, out var entry)
+        ? Option.Some(entry)
         : Option.None
 );
 
@@ -561,7 +565,7 @@ await validEntries.IterTask(async entry => {
     {
         await NotifyAdmins(entry);
     }
-}, Option.None, CancellationToken.None);
+}, Option.None, CancellationToken.None); // Only valid log entries are processed, invalid lines are skipped
 ```
 
 #### `Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`
@@ -603,30 +607,11 @@ await records.IterTask(
 Safely retrieves a value from a dictionary, returning an Option.
 
 ```csharp
-Dictionary<string, DatabaseConnection> connectionPool = GetConnectionPool();
-Option<DatabaseConnection> connection = connectionPool.Find("primary");
-
-connection.Match(
-    conn => ExecuteQuery(conn, sql),
-    () => Console.WriteLine("Primary connection not available")
-);
-
 // Safe configuration lookup with fallback
-Dictionary<string, string> appSettings = LoadAppSettings();
-string environment = appSettings.Find("Environment").IfNone(() => "Development");
-```
-
-#### `Find<TKey, TValue>(TKey key, Func<TValue> defaultProvider)`
-Safely retrieves a value or provides a default.
-
-```csharp
-// Configuration with smart defaults
 Dictionary<string, string> config = LoadConfiguration();
 int timeout = config.Find("RequestTimeoutSeconds")
-                    .Bind(value => int.TryParse(value, out var parsed) 
-                        ? Option.Some(parsed) 
-                        : Option.None)
+                    .Bind(value => int.TryParse(value, out var parsed)
+                                    ? Option.Some(parsed)
+                                    : Option.None)
                     .IfNone(() => 30);
-
-string logLevel = config.Find("LogLevel").IfNone(() => "Information");
 ```
