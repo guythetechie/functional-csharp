@@ -487,14 +487,14 @@ CancellationToken cancellationToken = GetCancellationToken();
 // Process with default parallelism
 images.Iter(
     image => ProcessImage(image),
-    Option.None,
+    maxDegreeOfParallelism: Option.None,
     cancellationToken
 );
 
 // Process with limited parallelism
 images.Iter(
     image => ProcessImage(image),
-    Option.Some(4), // Max 4 parallel operations
+    maxDegreeOfParallelism: 4, // Max 4 parallel operations, uses implicit conversion of int -> Option<int>
     cancellationToken
 );
 ```
@@ -508,7 +508,7 @@ CancellationToken cancellationToken = GetCancellationToken();
 
 await recipients.IterTask(
     async email => await SendEmailAsync(email),
-    Option.Some(10), // Max 10 concurrent email sends
+    maxDegreeOfParallelism: 10, // Max 10 concurrent email sends, uses implicit conversion of int -> Option<int>
     cancellationToken
 );
 ```
@@ -557,7 +557,7 @@ IAsyncEnumerable<DatabaseRecord> records = GetRecordsAsync();
 
 await records.IterTask(
     async record => await ProcessRecordAsync(record),
-    Option.Some(5), // Process 5 records concurrently
+    maxDegreeOfParallelism: 5, // Process 5 records concurrently, uses implicit conversion of int -> Option<int>
     cancellationToken
 );
 ```
