@@ -116,4 +116,7 @@ public static class Result
     public static T IfErrorThrow<T>(this Result<T> result) =>
         result.Match(value => value,
                      error => throw error.ToException());
+
+    public static Option<T> ToOption<T>(this Result<T> result) =>
+        result.Match(Option.Some, _ => Option.None);
 }

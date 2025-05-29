@@ -623,4 +623,31 @@ public class ResultTests
             result.Should().BeError().Which.Should().Be(error);
         });
     }
+
+    [Fact]
+    public void ToOption_with_success_returns_some()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            var result = Result.Success(value);
+            var option = result.ToOption();
+
+            option.Should().BeSome().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void ToOption_with_error_returns_none()
+    {
+        var gen = Generator.GenerateErrorResult<int>();
+
+        gen.Sample(result =>
+        {
+            var option = result.ToOption();
+
+            option.Should().BeNone();
+        });
+    }
 }

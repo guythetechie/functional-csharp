@@ -271,6 +271,19 @@ Result<EmailMessage> emailResult = ComposeEmail(recipient, subject, body);
 await emailResult.IterTask(async email => await SendEmailAsync(email));
 ```
 
+#### `ToOption<T>()`
+Converts a Result to an Option. Success values become Some, errors become None.
+
+```csharp
+Result<User> userResult = GetUser(userId);
+Option<User> userOption = userResult.ToOption();
+
+userOption.Match(
+    user => Console.WriteLine($"Found user: {user.Name}"),
+    () => Console.WriteLine("User not found")
+);
+```
+
 ---
 
 ### Either&lt;TLeft, TRight&gt;
