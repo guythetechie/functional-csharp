@@ -69,23 +69,23 @@ public record Error
 
     public sealed record Exceptional : Error
     {
-        private readonly Exception exception;
-
         internal Exceptional(Exception exception) : base([exception.Message])
         {
-            this.exception = exception;
+            Exception = exception;
         }
 
-        public override Exception ToException() => exception;
+        public Exception Exception { get; }
+
+        public override Exception ToException() => Exception;
 
         public bool Equals(Error.Exceptional? other) =>
             (this, other) switch
             {
                 (_, null) => false,
-                _ => exception.Equals(other.exception)
+                _ => Exception.Equals(other.Exception)
             };
 
         public override int GetHashCode() =>
-            exception.GetHashCode();
+            Exception.GetHashCode();
     }
 }
