@@ -144,6 +144,21 @@ Option<string> filePath = GetConfigFilePath();
 await filePath.IterTask(async path => await SaveConfigAsync(path));
 ```
 
+#### `IfNoneNull<T>()`
+Converts the option to a nullable reference type. Returns the value if present, otherwise returns null.
+
+```csharp
+Option<string> userName = GetUserName();
+string? nullableUserName = userName.IfNoneNull(); // Returns null if None, otherwise the string value
+
+#### `IfNoneNullable<T>()`
+Converts the option to a nullable value type. Returns the value if present, otherwise returns null.
+
+```csharp
+Option<int> userId = GetUserId();
+int? nullableUserId = userId.IfNoneNullable(); // Returns null if None, otherwise the int value
+```
+
 ---
 
 ### Result&lt;T&gt;
@@ -296,6 +311,22 @@ userOption.Match(
     user => Console.WriteLine($"Found user: {user.Name}"),
     () => Console.WriteLine("User not found")
 );
+```
+
+#### `IfErrorNull<T>()`
+Converts the result to a nullable reference type. Returns the value if successful, otherwise returns null.
+
+```csharp
+Result<string> apiResponse = CallApi();
+string? nullableResponse = apiResponse.IfErrorNull(); // Returns null if error, otherwise the string value
+```
+
+#### `IfErrorNullable<T>()`
+Converts the result to a nullable value type. Returns the value if successful, otherwise returns null.
+
+```csharp
+Result<int> calculationResult = PerformCalculation();
+int? nullableResult = calculationResult.IfErrorNullable(); // Returns null if error, otherwise the int value
 ```
 
 ---

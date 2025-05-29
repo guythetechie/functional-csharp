@@ -87,7 +87,7 @@ public static class Result
 
     public static Result<T> MapError<T>(this Result<T> result, Func<Error, Error> f) =>
         result.Match(value => Success(value),
-                     error => Error<T>(f(error))); 
+                     error => Error<T>(f(error)));
 
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
         result.Match(value => f(value),
@@ -120,6 +120,14 @@ public static class Result
     public static T IfErrorThrow<T>(this Result<T> result) =>
         result.Match(value => value,
                      error => throw error.ToException());
+
+    public static T? IfErrorNull<T>(this Result<T> result) where T : class =>
+        result.Match(value => (T?)value,
+                     _ => null);
+
+    public static T? IfErrorNullable<T>(this Result<T> result) where T : struct =>
+        result.Match(value => (T?)value,
+                     _ => null);
 
     public static Option<T> ToOption<T>(this Result<T> result) =>
         result.Match(Option.Some, _ => Option.None);

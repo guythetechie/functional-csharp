@@ -411,6 +411,66 @@ public class ResultTests
     }
 
     [Fact]
+    public void IfErrorNull_with_success_returns_value()
+    {
+        var gen = Gen.String.Where(x => x is not null);
+
+        gen.Sample(value =>
+        {
+            var result = Result.Success(value);
+
+            var nullableResult = result.IfErrorNull();
+
+            nullableResult.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void IfErrorNull_with_error_returns_null()
+    {
+        var gen = Generator.Error;
+
+        gen.Sample(error =>
+        {
+            var result = Result.Error<string>(error);
+
+            var nullableResult = result.IfErrorNull();
+
+            nullableResult.Should().BeNull();
+        });
+    }
+
+    [Fact]
+    public void IfErrorNullable_with_success_returns_value()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            var result = Result.Success(value);
+
+            var nullableResult = result.IfErrorNullable();
+
+            nullableResult.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void IfErrorNullable_with_error_returns_null()
+    {
+        var gen = Generator.Error;
+
+        gen.Sample(error =>
+        {
+            var result = Result.Error<int>(error);
+
+            var nullableResult = result.IfErrorNullable();
+
+            nullableResult.Should().BeNull();
+        });
+    }
+
+    [Fact]
     public void Equals_with_success_and_same_value_returns_true()
     {
         var gen = Gen.Int;

@@ -264,6 +264,56 @@ public class OptionTests
     }
 
     [Fact]
+    public void IfNoneNull_with_some_returns_value()
+    {
+        var gen = Gen.String;
+
+        gen.Sample(value =>
+        {
+            Option<string> option = Option.Some(value);
+
+            var result = option.IfNoneNull();
+
+            result.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void IfNoneNull_with_none_returns_null()
+    {
+        Option<string> option = Option.None;
+
+        var result = option.IfNoneNull();
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
+    public void IfNoneNullable_with_some_returns_value()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            Option<int> option = Option.Some(value);
+
+            var result = option.IfNoneNullable();
+
+            result.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void IfNoneNullable_with_none_returns_null()
+    {
+        Option<int> option = Option.None;
+
+        var result = option.IfNoneNullable();
+
+        result.Should().BeNull();
+    }
+
+    [Fact]
     public void IfNoneThrow_with_none_throws_exception()
     {
         var gen = from exceptionMessage in Gen.String

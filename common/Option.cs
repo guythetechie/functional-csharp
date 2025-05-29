@@ -118,15 +118,27 @@ public static class Option
 
     public static Option<TResult> SelectMany<T, T2, TResult>(this Option<T> option, Func<T, Option<T2>> f,
                                                          Func<T, T2, TResult> selector) =>
-        option.Bind(t => f(t).Map(t2 => selector(t, t2)));    public static T IfNone<T>(this Option<T> option, Func<T> f) =>
+        option.Bind(t => f(t).Map(t2 => selector(t, t2)));
+
+    public static T IfNone<T>(this Option<T> option, Func<T> f) =>
         option.Match(t => t,
-                     f);
+                    f);
+
+    public static T IfNoneThrow<T>(this Option<T> option, Func<Exception> getException) =>
+        option.Match(t => t,
+                     () => throw getException());
+
+    public static T? IfNoneNull<T>(this Option<T> option) where T : class =>
+    option.Match(t => (T?)t,
+                 () => null);
+
+    public static T? IfNoneNullable<T>(this Option<T> option) where T : struct =>
+        option.Match(t => (T?)t,
+                     () => null);
 
     public static void Iter<T>(this Option<T> option, Action<T> f) =>
         option.Match(f,
-                     () => { });    public static T IfNoneThrow<T>(this Option<T> option, Func<Exception> getException) =>
-        option.Match(t => t,
-                     () => throw getException());
+                     () => { });
 
     public static async ValueTask IterTask<T>(this Option<T> option, Func<T, ValueTask> f) =>
         await option.Match<ValueTask>(async t => await f(t),
