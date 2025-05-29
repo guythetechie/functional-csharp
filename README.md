@@ -247,6 +247,20 @@ Result<User> userResult = GetUser(userId);
 User user = userResult.IfError(error => new User("Guest"));
 ```
 
+#### `IfError<T>(Func<Error, Result<T>> errorHandler)`
+Provides a fallback Result when the current result is an error. This allows for chaining error recovery operations that might themselves fail.
+
+```csharp
+Result<User> userResult = GetUser(userId);
+Result<User> recoveredResult = userResult.IfError(error => 
+    GetUserFromCache(userId)); // Recovery operation that might also fail
+
+// Chain multiple fallback strategies
+Result<Config> configResult = LoadPrimaryConfig()
+    .IfError(_ => LoadBackupConfig())
+    .IfError(_ => LoadDefaultConfig());
+```
+
 #### `IfErrorThrow<T>()`
 Throws an exception when the result is an error.
 

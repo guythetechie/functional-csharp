@@ -271,6 +271,40 @@ public class ResultTests
     }
 
     [Fact]
+    public void IfError_returning_result_with_error_returns_fallback_result()
+    {
+        var gen = from errorResult in Generator.GenerateErrorResult<int>()
+                  from fallbackResult in Generator.GenerateResult(Gen.Int)
+                  select (errorResult, fallbackResult);
+
+        gen.Sample(x =>
+        {
+            var (errorResult, fallbackResult) = x;
+
+            var result = errorResult.IfError(_ => fallbackResult);
+
+            result.Should().Be(fallbackResult);
+        });
+    }
+
+    [Fact]
+    public void IfError_returning_result_with_success_returns_original_result()
+    {
+        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
+                  from fallbackResult in Generator.GenerateResult(Gen.Int)
+                  select (successResult, fallbackResult);
+
+        gen.Sample(x =>
+        {
+            var (successResult, fallbackResult) = x;
+
+            var result = successResult.IfError(_ => fallbackResult);
+
+            result.Should().Be(successResult);
+        });
+    }
+
+    [Fact]
     public void Iter_with_error_does_not_call_action()
     {
         var gen = Generator.GenerateErrorResult<int>();

@@ -105,6 +105,10 @@ public static class Result
         result.Match(value => value,
                      f);
 
+    public static Result<T> IfError<T>(this Result<T> result, Func<Error, Result<T>> f) =>
+        result.Match(_ => result,
+                     f);
+
     public static void Iter<T>(this Result<T> result, Action<T> f) =>
         result.Match(f,
                      _ => { });
