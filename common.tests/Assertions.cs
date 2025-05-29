@@ -61,7 +61,7 @@ internal sealed class OptionAssertions<T>(Option<T> subject, AssertionChain asse
 
         return new AndWhichConstraint<OptionAssertions<T>, T>(
             this,
-            Subject.IfNoneThrow(new UnreachableException()));
+            Subject.IfNoneThrow(() => new UnreachableException()));
     }
 
     public AndConstraint<OptionAssertions<T>> BeNone([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)

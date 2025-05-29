@@ -118,13 +118,13 @@ Option<string> userName = GetUserName();
 string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
-#### `IfNoneThrow<T>(Exception exception)`
-Throws an exception when the option is None.
+#### `IfNoneThrow<T>(Func<Exception> getException)`
+Throws an exception when the option is None. The exception is only created if needed.
 
 ```csharp
 Option<DatabaseConnection> connection = EstablishConnection();
 DatabaseConnection activeConnection = connection.IfNoneThrow(
-    new InvalidOperationException("Failed to establish database connection")
+    () => new InvalidOperationException("Failed to establish database connection")
 );
 ```
 

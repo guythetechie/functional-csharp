@@ -258,7 +258,7 @@ public class OptionTests
         gen.Sample(value =>
         {
             var option = Option.Some(value);
-            var result = option.IfNoneThrow(new UnreachableException());
+            var result = option.IfNoneThrow(() => new UnreachableException());
             result.Should().Be(value);
         });
     }
@@ -275,7 +275,7 @@ public class OptionTests
         {
             Option<int> option = Option.None;
 
-            var action = () => option.IfNoneThrow(exception);
+            var action = () => option.IfNoneThrow(() => exception);
 
             action.Should().Throw<Exception>().WithMessage(exception.Message).And.Should().BeOfType(exception.GetType());
         });
