@@ -64,7 +64,7 @@ public record Error
         messages.Count switch
         {
             0 => 0,
-            _ => messages.Aggregate(0, (hash, message) => hash ^ message.GetHashCode())
+            _ => messages.Aggregate(0, (hash, message) => HashCode.Combine(hash, message.GetHashCode()))
         };
 
     public sealed record Exceptional : Error
