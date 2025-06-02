@@ -124,6 +124,10 @@ public static class Option
         option.Match(t => t,
                     f);
 
+    public static Option<T> IfNone<T>(this Option<T> option, Func<Option<T>> f) =>
+        option.Match(t => option,
+                     f);
+
     public static T IfNoneThrow<T>(this Option<T> option, Func<Exception> getException) =>
         option.Match(t => t,
                      () => throw getException());

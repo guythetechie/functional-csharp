@@ -225,7 +225,7 @@ public class OptionTests
     }
 
     [Fact]
-    public void IfNone_with_some_returns_value()
+    public void IfNone_with_value_func_and_some_returns_value()
     {
         var gen = Gen.Int;
 
@@ -238,7 +238,7 @@ public class OptionTests
     }
 
     [Fact]
-    public void IfNone_with_none_returns_fallback()
+    public void IfNone_with_value_func_and_none_returns_fallback()
     {
         var gen = Gen.Int;
 
@@ -246,6 +246,39 @@ public class OptionTests
         {
             Option<int> option = Option.None;
             var result = option.IfNone(() => fallback);
+            result.Should().Be(fallback);
+        });
+    }
+
+    [Fact]
+    public void IfNone_with_option_func_and_some_returns_value()
+    {
+        var gen = from value in Gen.Int
+                  from fallback in Generator.GenerateOption(Gen.Int)
+                  select (value, fallback);
+
+        gen.Sample(x =>
+        {
+            var (value, fallback) = x;
+            var option = Option.Some(value);
+
+            var result = option.IfNone(() => fallback);
+
+            result.Should().BeSome().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void IfNone_with_option_func_and_none_returns_fallback()
+    {
+        var gen = Generator.GenerateOption(Gen.Int);
+
+        gen.Sample(fallback =>
+        {
+            Option<int> option = Option.None;
+
+            var result = option.IfNone(() => fallback);
+
             result.Should().Be(fallback);
         });
     }

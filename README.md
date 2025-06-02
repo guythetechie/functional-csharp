@@ -118,6 +118,24 @@ Option<string> userName = GetUserName();
 string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
+#### `IfNone<T>(Func<Option<T>> fallbackProvider)`
+Provides a fallback Option when the current option is None. This allows for chaining multiple optional sources.
+
+```csharp
+Option<Config> primaryConfig = LoadPrimaryConfig();
+Option<Config> configWithFallback = primaryConfig.IfNone(() => LoadDefaultConfig());
+
+// Chain multiple fallback strategies
+Option<User> user = GetUserFromCache(userId)
+    .IfNone(() => GetUserFromDatabase(userId))
+    .IfNone(() => GetGuestUser());
+
+user.Match(
+    u => Console.WriteLine($"Found user: {u.Name}"),
+    () => Console.WriteLine("No user available")
+);
+```
+
 #### `IfNoneThrow<T>(Func<Exception> getException)`
 Throws an exception when the option is None. The exception is only created if needed.
 
