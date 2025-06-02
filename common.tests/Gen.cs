@@ -1,5 +1,8 @@
 using CsCheck;
 using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
 
 namespace common.tests;
 
@@ -57,4 +60,15 @@ internal static class Generator
     public static Gen<Result<T>> GenerateResult<T>(Gen<T> gen) =>
         Gen.Frequency((9, GenerateSuccessResult(gen)),
                       (1, GenerateErrorResult<T>()));
+
+    public static Gen<ImmutableArray<T2>> Traverse<T1, T2>(IEnumerable<T1> source, Func<T1, Gen<T2>> f) =>
+        source.Aggregate(Gen.Const(new List<T2>()),
+                         (listGen, item) => Gen.Select(listGen, f(item))
+                                               .Select(x =>
+                                               {
+                                                   var (list, item) = x;
+                                                   list.Add(item);
+                                                   return list;
+                                               }))
+               .Select(list => list.ToImmutableArray());
 }

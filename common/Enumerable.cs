@@ -30,6 +30,16 @@ public static class EnumerableExtensions
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
 
+    /// <summary>
+    /// Returns the first <see cref="Option{T2}"/> that is in the <see cref="Option{T2}.Some"/> state after applying <paramref name="selector"/> to each element.
+    /// If no element produces a <see cref="Option{T2}.Some"/> value, returns <see cref="Option{T2}.None"/>.
+    /// </summary>
+    public static Option<T2> Pick<T, T2>(this IEnumerable<T> source, Func<T, Option<T2>> selector) =>
+        source.Select(selector)
+              .Where(option => option.IsSome)
+              .DefaultIfEmpty(Option.None)
+              .First();
+
     public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
@@ -82,6 +92,16 @@ public static class AsyncEnumerableExtensions
         source.Select(selector)
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
+
+    /// <summary>
+    /// Returns the first <see cref="Option{T2}"/> that is in the <see cref="Option{T2}.Some"/> state after applying <paramref name="selector"/> to each element.
+    /// If no element produces a <see cref="Option{T2}.Some"/> value, returns <see cref="Option{T2}.None"/>.
+    /// </summary>
+    public static async ValueTask<Option<T2>> Pick<T, T2>(this IAsyncEnumerable<T> source, Func<T, Option<T2>> selector, CancellationToken cancellationToken) =>
+        await source.Select(selector)
+                    .Where(option => option.IsSome)
+                    .DefaultIfEmpty(Option.None)
+                    .FirstAsync(cancellationToken);
 
     public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
     {

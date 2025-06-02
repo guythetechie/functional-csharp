@@ -532,6 +532,26 @@ var validNumbers = inputs.Choose(input =>
 validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Output: 42, 100, 7
 ```
 
+#### `Pick<T, T2>(Func<T, Option<T2>> selector)`
+Returns the first successful transformation, or None if no element produces a Some value.
+
+```csharp
+// Find the first valid configuration file
+string[] configPaths = { "/etc/app.conf", "/usr/local/etc/app.conf", "./app.conf" };
+Option<ConfigFile> config = configPaths.Pick(path =>
+    File.Exists(path) ? Option.Some(LoadConfig(path)) : Option.None);
+
+config.Match(
+    cfg => Console.WriteLine($"Loaded config from {cfg.Path}"),
+    () => Console.WriteLine("No configuration file found")
+);
+
+// Find the first even number
+int[] numbers = { 1, 3, 5, 8, 9, 12 };
+Option<int> firstEven = numbers.Pick(n =>
+    n % 2 == 0 ? Option.Some(n) : Option.None); // Some(8)
+```
+
 #### `Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
 Applies an operation returning a `Result<T2>` to each element, aggregates successes or combines errors.
 
@@ -624,6 +644,19 @@ await validEntries.IterTask(async entry => {
         await NotifyAdmins(entry);
     }
 }, Option.None, CancellationToken.None); // Only valid log entries are processed, invalid lines are skipped
+```
+
+#### `Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
+Returns the first successful transformation asynchronously, or None if no element produces a Some value.
+
+```csharp
+// Find the first valid data record in a stream
+IAsyncEnumerable<string> dataStream = ReadDataStreamAsync();
+Option<DataRecord> firstValid = await dataStream.Pick(line =>
+    TryParseDataRecord(line, out var record)
+        ? Option.Some(record)
+        : Option.None,
+    cancellationToken); // Returns as soon as a valid record is found
 ```
 
 #### `Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`

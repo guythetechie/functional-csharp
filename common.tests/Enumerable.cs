@@ -83,6 +83,39 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void Pick_with_no_somes_returns_none()
+    {
+        var gen = from array in Gen.Int.Array
+                  select array;
+
+        gen.Sample(array =>
+        {
+            var result = array.Pick(x => Option<int>.None());
+
+            result.Should().BeNone();
+        });
+    }
+
+    [Fact]
+    public void Pick_with_some_returns_first_some_value()
+    {
+        var gen = from array in Gen.Int.Array
+                  where array.Length > 0
+                  from value in Gen.OneOfConst(array)
+                  select (value, array);
+
+        gen.Sample(x =>
+        {
+            (var value, var array) = x;
+            Option<int> chooser(int x) => x == value ? Option.Some(x) : Option.None;
+
+            var result = array.Pick(chooser);
+
+            result.Should().BeSome().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
     public void Traverse_with_all_success_returns_success_with_expected_array()
     {
         var gen = Gen.Int.Array;
@@ -359,6 +392,39 @@ public class AsyncEnumerableExtensionsTests
             var expected = await array.Where(x => x % 2 == 0).ToArrayAsync();
             var actual = await result.ToArrayAsync();
             actual.Should().BeEquivalentTo(expected);
+        });
+    }
+
+    [Fact]
+    public async Task Pick_with_no_somes_returns_none()
+    {
+        var gen = from array in Gen.Int.Array
+                  select array.ToAsyncEnumerable();
+
+        await gen.SampleAsync(async array =>
+        {
+            var result = await array.Pick(x => Option<int>.None(), CancellationToken.None);
+
+            result.Should().BeNone();
+        });
+    }
+
+    [Fact]
+    public async Task Pick_with_some_returns_first_some_value()
+    {
+        var gen = from array in Gen.Int.Array
+                  where array.Length > 0
+                  from value in Gen.OneOfConst(array)
+                  select (value, array.ToAsyncEnumerable());
+
+        await gen.SampleAsync(async x =>
+        {
+            (var value, var array) = x;
+            Option<int> chooser(int x) => x == value ? Option.Some(x) : Option.None;
+
+            var result = await array.Pick(chooser, CancellationToken.None);
+
+            result.Should().BeSome().Which.Should().Be(value);
         });
     }
 
