@@ -75,20 +75,12 @@ public sealed record Option<T>
         None();
 }
 
-public sealed record None
+public readonly record struct None
 {
-    public static None Instance { get; } = new();
-
-    private None() { }
-
     public override string ToString() =>
         "None";
 
-    public bool Equals(None? other) =>
-        other is not null;
-
-    public override int GetHashCode() =>
-        0;
+    public override int GetHashCode() => 0;
 }
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
@@ -98,8 +90,7 @@ public static class Option
     public static Option<T> Some<T>(T value) =>
         Option<T>.Some(value);
 
-    public static None None =>
-        None.Instance;
+    public static None None { get; }
 
     public static Option<T> Where<T>(this Option<T> option, Func<T, bool> predicate) =>
         option.Match(t => predicate(t) ? option : None,
