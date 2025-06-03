@@ -35,7 +35,7 @@ Option<string> fromValue = "hello";      // Some("hello")
 Option<string> fromNone = Option.None;   // None
 ```
 
-#### `Match<T2>(Func<T, T2> some, Func<T2> none)`
+#### `T2 Match<T2>(Func<T, T2> some, Func<T2> none)`
 Pattern matches on the option, executing the appropriate function.
 
 ```csharp
@@ -46,7 +46,7 @@ string displayText = userEmail.Match(
 );
 ```
 
-#### `Match(Action<T> some, Action none)`
+#### `void Match(Action<T> some, Action none)`
 Pattern matches for side effects without returning a value.
 
 ```csharp
@@ -57,7 +57,7 @@ currentUser.Match(
 );
 ```
 
-#### `Map<T2>(Func<T, T2> mapper)`
+#### `Option<T2> Map<T2>(Func<T, T2> mapper)`
 Transforms the value if present, otherwise returns None.
 
 ```csharp
@@ -70,7 +70,7 @@ Option<decimal> tax = price.Map(p => decimal.Parse(p))
                            .Map(p => p * 0.08m); // Some(2.3992m)
 ```
 
-#### `Bind<T2>(Func<T, Option<T2>> binder)`
+#### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
 Applies an Option-returning function to the value. If the value is not present, returns None.
 
 ```csharp
@@ -84,7 +84,7 @@ static Option<User> FindUserById(string id) =>
         : Option.None;
 ```
 
-#### `Where(Func<T, bool> predicate)`
+#### `Option<T> Where(Func<T, bool> predicate)`
 Filters the option based on a predicate. Returns None if there is no value, or if the predicate is false.
 
 ```csharp
@@ -111,7 +111,7 @@ orderSummary.Match(
 );
 ```
 
-#### `IfNone<T>(Func<T> defaultProvider)`
+#### `T IfNone(Func<T> defaultProvider)`
 Provides a default value when the option is None.
 
 ```csharp
@@ -119,7 +119,7 @@ Option<string> userName = GetUserName();
 string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
-#### `IfNone<T>(Func<Option<T>> fallbackProvider)`
+#### `Option<T> IfNone(Func<Option<T>> fallbackProvider)`
 Provides a fallback Option when the current option is None. This allows for chaining multiple optional sources.
 
 ```csharp
@@ -137,7 +137,7 @@ user.Match(
 );
 ```
 
-#### `IfNoneThrow<T>(Func<Exception> getException)`
+#### `T IfNoneThrow(Func<Exception> getException)`
 Throws an exception when the option is None. The exception is only created if needed.
 
 ```csharp
@@ -147,7 +147,7 @@ DatabaseConnection activeConnection = connection.IfNoneThrow(
 );
 ```
 
-#### `Iter(Action<T> action)`
+#### `void Iter(Action<T> action)`
 Executes an action if the option contains a value.
 
 ```csharp
@@ -155,7 +155,7 @@ Option<LogEntry> latestEntry = GetLatestLogEntry();
 latestEntry.Iter(entry => Console.WriteLine($"Latest: {entry.Message}"));
 ```
 
-#### `IterTask(Func<T, ValueTask> asyncAction)`
+#### `ValueTask IterTask(Func<T, ValueTask> asyncAction)`
 Executes an async action if the option contains a value.
 
 ```csharp
@@ -163,14 +163,14 @@ Option<string> filePath = GetConfigFilePath();
 await filePath.IterTask(async path => await SaveConfigAsync(path));
 ```
 
-#### `IfNoneNull<T>()`
+#### `T? IfNoneNull()`
 Converts the option to a nullable reference type. Returns the value if present, otherwise returns null.
 
 ```csharp
 Option<string> userName = GetUserName();
 string? nullableUserName = userName.IfNoneNull(); // Returns null if None, otherwise the string value
 
-#### `IfNoneNullable<T>()`
+#### `T? IfNoneNullable()`
 Converts the option to a nullable value type. Returns the value if present, otherwise returns null.
 
 ```csharp
@@ -199,7 +199,7 @@ Result<string> fromValue = "success";                    // Success
 Result<string> fromError = Error.From("failure");       // Error
 ```
 
-#### `Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onError)`
+#### `TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onError)`
 Pattern matches on the result, executing the appropriate function.
 
 ```csharp
@@ -210,7 +210,7 @@ string message = userResult.Match(
 );
 ```
 
-#### `Match(Action<T> onSuccess, Action<Error> onError)`
+#### `void Match(Action<T> onSuccess, Action<Error> onError)`
 Pattern matches for side effects without returning a value.
 
 ```csharp
@@ -221,7 +221,7 @@ orderResult.Match(
 );
 ```
 
-#### `Map<T2>(Func<T, T2> mapper)`
+#### `Result<T2> Map<T2>(Func<T, T2> mapper)`
 Transforms the success value, otherwise preserves the error.
 
 ```csharp
@@ -233,7 +233,7 @@ Result<string> invalidInput = Result.Error<string>(Error.From("Invalid format"))
 Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input)); // Error("Invalid format")
 ```
 
-#### `MapError<T>(Func<Error, Error> mapper)`
+#### `Result<T> MapError(Func<Error, Error> mapper)`
 Transforms the error if the result is in error; otherwise preserves the success value.
 
 ```csharp
@@ -247,7 +247,7 @@ Result<ConfigFile> contextualError = configResult.MapError(error =>
     error + Error.From($"Failed to load configuration from settings.json"));
 ```
 
-#### `Bind<T2>(Func<T, Result<T2>> binder)`
+#### `Result<T2> Bind<T2>(Func<T, Result<T2>> binder)`
 Chains operations that return Results, allowing for sequential error handling.
 
 ```csharp
@@ -273,7 +273,7 @@ result.Match(
 );
 ```
 
-#### `IfError<T>(Func<Error, T> errorHandler)`
+#### `T IfError(Func<Error, T> errorHandler)`
 Provides a fallback value when the result is an error.
 
 ```csharp
@@ -281,7 +281,7 @@ Result<User> userResult = GetUser(userId);
 User user = userResult.IfError(error => new User("Guest"));
 ```
 
-#### `IfError<T>(Func<Error, Result<T>> errorHandler)`
+#### `Result<T> IfError(Func<Error, Result<T>> errorHandler)`
 Provides a fallback Result when the current result is an error. This allows for chaining error recovery operations that might themselves fail.
 
 ```csharp
@@ -295,7 +295,7 @@ Result<Config> configResult = LoadPrimaryConfig()
     .IfError(_ => LoadDefaultConfig());
 ```
 
-#### `IfErrorThrow<T>()`
+#### `T IfErrorThrow()`
 Throws an exception when the result is an error.
 
 ```csharp
@@ -303,7 +303,7 @@ Result<DatabaseConnection> connectionResult = ConnectToDatabase();
 DatabaseConnection connection = connectionResult.IfErrorThrow(); // Throws if connection failed
 ```
 
-#### `Iter(Action<T> action)`
+#### `void Iter(Action<T> action)`
 Executes an action if the result is successful.
 
 ```csharp
@@ -311,7 +311,7 @@ Result<Report> reportResult = GenerateReport(parameters);
 reportResult.Iter(report => SaveReportToFile(report));
 ```
 
-#### `IterTask(Func<T, ValueTask> asyncAction)`
+#### `ValueTask IterTask(Func<T, ValueTask> asyncAction)`
 Executes an async action if the result is successful.
 
 ```csharp
@@ -319,7 +319,7 @@ Result<EmailMessage> emailResult = ComposeEmail(recipient, subject, body);
 await emailResult.IterTask(async email => await SendEmailAsync(email));
 ```
 
-#### `ToOption<T>()`
+#### `Option<T> ToOption()`
 Converts a Result to an Option. Success values become Some, errors become None.
 
 ```csharp
@@ -332,7 +332,7 @@ userOption.Match(
 );
 ```
 
-#### `IfErrorNull<T>()`
+#### `T? IfErrorNull()`
 Converts the result to a nullable reference type. Returns the value if successful, otherwise returns null.
 
 ```csharp
@@ -340,7 +340,7 @@ Result<string> apiResponse = CallApi();
 string? nullableResponse = apiResponse.IfErrorNull(); // Returns null if error, otherwise the string value
 ```
 
-#### `IfErrorNullable<T>()`
+#### `T? IfErrorNullable()`
 Converts the result to a nullable value type. Returns the value if successful, otherwise returns null.
 
 ```csharp
@@ -366,7 +366,7 @@ Either<CachedData, FreshData> cachedResult = Either.Left<CachedData, FreshData>(
 Either<CachedData, FreshData> freshResult = Either.Right<CachedData, FreshData>(new FreshData(apiResponse));
 ```
 
-#### `Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight)`
+#### `T Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight)`
 Pattern matches on the either, executing the appropriate function.
 
 ```csharp
@@ -377,7 +377,7 @@ string sourceInfo = dataSource.Match(
 );
 ```
 
-#### `Match(Action<TLeft> onLeft, Action<TRight> onRight)`
+#### `void Match(Action<TLeft> onLeft, Action<TRight> onRight)`
 Pattern matches for side effects without returning a value.
 
 ```csharp
@@ -388,7 +388,7 @@ notification.Match(
 );
 ```
 
-#### `Map<TRight2>(Func<TRight, TRight2> mapper)`
+#### `Either<TLeft, TRight2> Map<TRight2>(Func<TRight, TRight2> mapper)`
 Transforms the right value, otherwise preserves the left value.
 
 ```csharp
@@ -400,7 +400,7 @@ Either<ErrorMessage, UserData> errorCase = Either.Left<ErrorMessage, UserData>(n
 Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName); // Left(ErrorMessage("Not found"))
 ```
 
-#### `Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
+#### `Either<TLeft, TRight2> Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
 Chains operations that return Either values.
 
 ```csharp
@@ -426,7 +426,7 @@ var result = from source in DetermineDataSource(config)
              select new ProcessedResult(processed);
 ```
 
-#### `IfLeft<TRight>(Func<TLeft, TRight> leftHandler)`
+#### `TRight IfLeft(Func<TLeft, TRight> leftHandler)`
 Provides a right value when the either contains a left value.
 
 ```csharp
@@ -434,7 +434,7 @@ Either<DefaultConfig, CustomConfig> configChoice = LoadUserConfig();
 CustomConfig finalConfig = configChoice.IfLeft(defaultCfg => ConvertToCustomConfig(defaultCfg));
 ```
 
-#### `IfRight<TLeft>(Func<TRight, TLeft> rightHandler)`
+#### `TLeft IfRight(Func<TRight, TLeft> rightHandler)`
 Provides a left value when the either contains a right value.
 
 ```csharp
@@ -442,7 +442,7 @@ Either<BasicPlan, PremiumPlan> userPlan = Either.Right<BasicPlan, PremiumPlan>(p
 BasicPlan planForLogging = userPlan.IfRight(premium => CreateBasicSummary(premium));
 ```
 
-#### `IfLeftThrow<TRight>(Exception exception)`
+#### `TRight IfLeftThrow(Exception exception)`
 Throws an exception when the either contains a left value.
 
 ```csharp
@@ -450,7 +450,7 @@ Either<TrialVersion, FullVersion> softwareVersion = CheckLicense();
 FullVersion licensed = softwareVersion.IfLeftThrow(new InvalidOperationException("Full license required"));
 ```
 
-#### `Iter(Action<TRight> action)`
+#### `void Iter(Action<TRight> action)`
 Executes an action if the either contains a right value.
 
 ```csharp
@@ -481,7 +481,7 @@ Error implicitError = "Something went wrong";
 Error implicitException = new InvalidOperationException("Can't do that.");
 ```
 
-#### `operator +(Error left, Error right)`
+#### `Error operator +(Error left, Error right)`
 Combines multiple errors into a single error.
 
 ```csharp
@@ -490,7 +490,7 @@ Error passwordError = Error.From("Password too weak");
 Error combinedError = emailError + passwordError; // Error with both messages: "Invalid email format", "Password too weak"
 ```
 
-#### `Messages`
+#### `ImmutableHashSet<string> Messages`
 Gets all error messages as an immutable set.
 
 ```csharp
@@ -498,7 +498,7 @@ Error error = Error.From("Error 1", "Error 2");
 error.Messages.Iter(message => Console.WriteLine($"Error: {message}"));
 ```
 
-#### `ToException()`
+#### `Exception ToException()`
 Converts the error to an appropriate exception.
 
 ```csharp
@@ -522,7 +522,7 @@ Exception originalException = fileError.ToException(); // The original FileNotFo
 
 Extensions for working with `IEnumerable<T>` in a functional style.
 
-#### `Head<T>()`
+#### `Option<T> Head<T>()`
 Returns the first element as an Option, or None if the sequence is empty.
 
 ```csharp
@@ -539,7 +539,7 @@ int[] numbers = { };
 Option<int> firstNumber = numbers.Head(); // None (instead of throwing an exception)
 ```
 
-#### `Choose<T, T2>(Func<T, Option<T2>> selector)`
+#### `IEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
 Applies a function to each element and returns only the successful transformations.
 
 ```csharp
@@ -551,7 +551,7 @@ var validNumbers = inputs.Choose(input =>
 validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Output: 42, 100, 7
 ```
 
-#### `Pick<T, T2>(Func<T, Option<T2>> selector)`
+#### `Option<T2> Pick<T, T2>(Func<T, Option<T2>> selector)`
 Returns the first successful transformation, or None if no element produces a Some value.
 
 ```csharp
@@ -571,7 +571,7 @@ Option<int> firstEven = numbers.Pick(n =>
     n % 2 == 0 ? Option.Some(n) : Option.None); // Some(8)
 ```
 
-#### `Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
+#### `Result<ImmutableArray<T2>> Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
 Applies an operation returning a `Result<T2>` to each element, aggregates successes or combines errors.
 
 ```csharp
@@ -590,7 +590,7 @@ Result<ImmutableArray<Email>> failedValidation = mixedInputs.Traverse(
 ); // Error("Invalid email: invalid-email", "Invalid email: bad-format")
 ```
 
-#### `Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `void Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
 Executes an action on each element in parallel.
 
 ```csharp
@@ -612,7 +612,7 @@ images.Iter(
 );
 ```
 
-#### `IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `ValueTask IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
 Executes an async action on each element in parallel.
 
 ```csharp
@@ -632,7 +632,7 @@ await recipients.IterTask(
 
 Extensions for working with `IAsyncEnumerable<T>`.
 
-#### `Head<T>(CancellationToken cancellationToken)`
+#### `ValueTask<Option<T>> Head<T>(CancellationToken cancellationToken)`
 Returns the first element as an Option asynchronously.
 
 ```csharp
@@ -645,7 +645,7 @@ firstEntry.Match(
 );
 ```
 
-#### `Choose<T, T2>(Func<T, Option<T2>> selector)`
+#### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
 Applies a function to each element and returns only the successful transformations.
 
 ```csharp
@@ -665,7 +665,7 @@ await validEntries.IterTask(async entry => {
 }, Option.None, CancellationToken.None); // Only valid log entries are processed, invalid lines are skipped
 ```
 
-#### `Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
+#### `ValueTask<Option<T2>> Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
 Returns the first successful transformation asynchronously, or None if no element produces a Some value.
 
 ```csharp
@@ -678,7 +678,7 @@ Option<DataRecord> firstValid = await dataStream.Pick(line =>
     cancellationToken); // Returns as soon as a valid record is found
 ```
 
-#### `Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`
+#### `ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`
 Applies an async operation returning `ValueTask<Result<T2>>` to each element, aggregates successes or combines errors.
 
 ```csharp
@@ -696,7 +696,7 @@ validationResult.Match(
 );
 ```
 
-#### `IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `ValueTask IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
 Executes an async action on each element in parallel.
 
 ```csharp
@@ -713,7 +713,7 @@ await records.IterTask(
 
 ### Dictionary Extensions
 
-#### `Find<TKey, TValue>(TKey key)`
+#### `Option<TValue> Find<TKey, TValue>(TKey key)`
 Safely retrieves a value from a dictionary, returning an Option.
 
 ```csharp
@@ -727,6 +727,8 @@ int timeout = config.Find("RequestTimeoutSeconds")
 ```
 ---
 
+---
+
 ### Unit
 
 Represents the absence of a meaningful value. Unit is used in functional programming to indicate that a function performs side effects but doesn't return a meaningful value. It's the functional equivalent of void, but as a proper type that can be used in generic contexts.
@@ -735,6 +737,27 @@ Represents the absence of a meaningful value. Unit is used in functional program
 // Using Unit as a return type for side-effect functions
 Func<string, Unit> logMessage = message => {
     Console.WriteLine($"Log: {message}");
-    return new Unit();
+    return Unit.Instance;
 };
+
+// Unit in generic contexts where void cannot be used
+Option<Unit> maybeLog = shouldLog 
+    ? Option.Some(logMessage("Hello world"))
+    : Option.None;
+
+// String representation
+Unit unit = Unit.Instance;
+Console.WriteLine(unit); // Output: ()
+```
+
+#### `static Unit Instance`
+A shared instance of Unit. Since all Unit values are logically equivalent, this instance can be reused to avoid unnecessary allocations.
+
+```csharp
+// Preferred way to return Unit
+public Unit ProcessData(string data)
+{
+    // ... perform side effects ...
+    return Unit.Instance;
+}
 ```
