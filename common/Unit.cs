@@ -7,9 +7,8 @@ namespace common;
 /// </summary>
 public readonly record struct Unit
 {
-    /// <summary>
-    /// Returns a string representation of Unit.
-    /// </summary>
+    public static Unit Instance { get; }
+    
     public override string ToString() => "()";
 
     public override int GetHashCode() => 0;
