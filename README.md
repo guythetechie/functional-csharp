@@ -12,6 +12,7 @@ A minimal set of functional programming classes for C#. Copy any class you need 
 | [Result&lt;T&gt;](#resultt) | Represents the result of an operation that can succeed or fail |
 | [Either&lt;TLeft, TRight&gt;](#eithertleft-tright) | Represents a value that can be one of two types |
 | [Error](#error) | Represents error information with multiple messages or exceptions |
+| [Unit](#unit) | Represents the absence of a meaningful value (functional equivalent of void) |
 | [Enumerable Extensions](#enumerable-extensions) | Extensions for working with `IEnumerable<T>` |
 | [AsyncEnumerable Extensions](#asyncenumerable-extensions) | Extensions for working with `IAsyncEnumerable<T>` |
 | [Dictionary Extensions](#dictionary-extensions) | Extensions for safe dictionary operations |
@@ -723,4 +724,17 @@ int timeout = config.Find("RequestTimeoutSeconds")
                                     ? Option.Some(parsed)
                                     : Option.None)
                     .IfNone(() => 30);
+```
+---
+
+### Unit
+
+Represents the absence of a meaningful value. Unit is used in functional programming to indicate that a function performs side effects but doesn't return a meaningful value. It's the functional equivalent of void, but as a proper type that can be used in generic contexts.
+
+```csharp
+// Using Unit as a return type for side-effect functions
+Func<string, Unit> logMessage = message => {
+    Console.WriteLine($"Log: {message}");
+    return new Unit();
+};
 ```
