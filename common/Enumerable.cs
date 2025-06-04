@@ -69,6 +69,17 @@ public static class EnumerableExtensions
 
         await Parallel.ForEachAsync(source, options, async (item, _) => await action(item));
     }
+
+    /// <summary>
+    /// Executes a side effect action on each element as it's enumerated, returning the original enumerable unchanged.
+    /// Useful for debugging, logging, or other side effects in LINQ chains without affecting the data flow.
+    /// </summary>
+    public static IEnumerable<T> Tap<T>(this IEnumerable<T> source, Action<T> action) =>
+        source.Select(item =>
+        {
+            action(item);
+            return item;
+        });
 }
 
 public static class AsyncEnumerableExtensions
@@ -128,6 +139,28 @@ public static class AsyncEnumerableExtensions
 
         await Parallel.ForEachAsync(source, options, async (item, _) => await action(item));
     }
+
+    /// <summary>
+    /// Executes a side effect action on each element as it's enumerated, returning the original async enumerable unchanged.
+    /// Useful for debugging, logging, or other side effects in async LINQ chains without affecting the data flow.
+    /// </summary>
+    public static IAsyncEnumerable<T> Tap<T>(this IAsyncEnumerable<T> source, Action<T> action) =>
+        source.Select(item =>
+        {
+            action(item);
+            return item;
+        });
+
+    /// <summary>
+    /// Executes an async side effect action on each element as it's enumerated, returning the original async enumerable unchanged.
+    /// Useful for debugging, logging, or other async side effects in async LINQ chains without affecting the data flow.
+    /// </summary>
+    public static IAsyncEnumerable<T> TapTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action) =>
+        source.Select(async (T item, CancellationToken _) =>
+        {
+            await action(item);
+            return item;
+        });
 }
 
 public static class DictionaryExtensions

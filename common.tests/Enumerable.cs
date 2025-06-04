@@ -2,6 +2,7 @@ using common;
 using CsCheck;
 using FluentAssertions;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -123,7 +124,7 @@ public class EnumerableExtensionsTests
         gen.Sample(array =>
         {
             var f = (int x) => Result.Success(x);
-            var result = array.Traverse(f, CancellationToken.None);
+            var result = array.Traverse(f, TestContext.Current.CancellationToken);
             result.Should().BeSuccess().Which.Should().BeEquivalentTo(array);
         });
     }
@@ -147,7 +148,7 @@ public class EnumerableExtensionsTests
                     ? Result.Error<int>(Error.From($"error:{x.index}"))
                     : Result.Success(x.value);
 
-            var result = indexedArray.Traverse(f, CancellationToken.None);
+            var result = indexedArray.Traverse(f, TestContext.Current.CancellationToken);
 
             result.Should().BeError().Which.Messages.Should().HaveSameCount(errorIndices);
         });
@@ -168,7 +169,7 @@ public class EnumerableExtensionsTests
 
             array.Iter(x => ImmutableInterlocked.Update(ref addedItems, items => items.Add(x)),
                        maxDegreesOfParallelism,
-                       CancellationToken.None);
+                       TestContext.Current.CancellationToken);
 
             addedItems.Should().BeEquivalentTo(array);
         });
@@ -221,7 +222,7 @@ public class EnumerableExtensionsTests
                 {
                     iterations++;
                     throw new InvalidOperationException();
-                }, maxDegreesOfParallelism, CancellationToken.None);
+                }, maxDegreesOfParallelism, TestContext.Current.CancellationToken);
             }
             catch (Exception)
             {
@@ -250,7 +251,7 @@ public class EnumerableExtensionsTests
             {
                 ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
                 await ValueTask.CompletedTask;
-            }, maxDegreeOfParallelism: Option.None, CancellationToken.None);
+            }, maxDegreeOfParallelism: Option.None, TestContext.Current.CancellationToken);
 
             addedItems.Should().BeEquivalentTo(array);
         });
@@ -304,7 +305,7 @@ public class EnumerableExtensionsTests
                     iterations++;
                     await ValueTask.CompletedTask;
                     throw new InvalidOperationException();
-                }, maxDegreesOfParallelism, CancellationToken.None);
+                }, maxDegreesOfParallelism, TestContext.Current.CancellationToken);
             }
             catch (Exception)
             {
@@ -312,6 +313,66 @@ public class EnumerableExtensionsTests
 #pragma warning restore CA1031 // Do not catch general exception types
 
             iterations.Should().BeLessThanOrEqualTo(maxDegreesOfParallelism);
+        });
+    }
+
+    [Fact]
+    public void Tap_executes_side_effect_and_preserves_original_enumerable()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            var tapCount = 0;
+
+            var result = array.Tap(_ => tapCount++)
+                              .ToArray();
+
+            result.Should().BeEquivalentTo(array);
+            tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public void Tap_is_lazily_evaluated()
+    {
+        var gen = Gen.Int.Array.Where(arr => arr.Length > 0);
+
+        gen.Sample(array =>
+        {
+            var tapCount = 0;
+
+            // Create the tapped enumerable but don't enumerate it yet
+            var tappedEnumerable = array.Tap(_ => tapCount++);
+
+            // Side effect should not have executed yet
+            tapCount.Should().Be(0);
+
+            // Now enumerate it
+            var _ = tappedEnumerable.ToArray();
+
+            // Side effect should have executed for each element
+            tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public void Tap_can_be_chained_multiple_times()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            var firstTapCount = 0;
+            var secondTapCount = 0;
+
+            var result = array.Tap(_ => firstTapCount++)
+                              .Tap(_ => secondTapCount++)
+                              .ToArray();
+
+            result.Should().BeEquivalentTo(array);
+            firstTapCount.Should().Be(array.Length);
+            secondTapCount.Should().Be(array.Length);
         });
     }
 }
@@ -323,7 +384,7 @@ public class AsyncEnumerableExtensionsTests
     {
         var emptyEnumerable = AsyncEnumerable.Empty<int>();
 
-        var result = await emptyEnumerable.Head(CancellationToken.None);
+        var result = await emptyEnumerable.Head(TestContext.Current.CancellationToken);
 
         result.Should().BeNone();
     }
@@ -340,7 +401,7 @@ public class AsyncEnumerableExtensionsTests
         {
             var (first, array) = x;
 
-            var result = await array.Head(CancellationToken.None);
+            var result = await array.Head(TestContext.Current.CancellationToken);
 
             result.Should().BeSome().Which.Should().Be(first);
         });
@@ -356,8 +417,8 @@ public class AsyncEnumerableExtensionsTests
         {
             var result = array.Choose(x => Option.Some(x * 2));
 
-            var actual = await result.ToArrayAsync();
-            var expected = await result.ToArrayAsync();
+            var actual = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            var expected = await result.ToArrayAsync(TestContext.Current.CancellationToken);
             actual.Should().HaveSameCount(expected);
         });
     }
@@ -372,7 +433,7 @@ public class AsyncEnumerableExtensionsTests
         {
             var result = array.Choose(_ => Option<int>.None());
 
-            var resultArray = await result.ToArrayAsync();
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
             resultArray.Should().BeEmpty();
         });
     }
@@ -389,8 +450,8 @@ public class AsyncEnumerableExtensionsTests
 
             var result = array.Choose(chooser);
 
-            var expected = await array.Where(x => x % 2 == 0).ToArrayAsync();
-            var actual = await result.ToArrayAsync();
+            var expected = await array.Where(x => x % 2 == 0).ToArrayAsync(TestContext.Current.CancellationToken);
+            var actual = await result.ToArrayAsync(TestContext.Current.CancellationToken);
             actual.Should().BeEquivalentTo(expected);
         });
     }
@@ -403,7 +464,7 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
-            var result = await array.Pick(x => Option<int>.None(), CancellationToken.None);
+            var result = await array.Pick(x => Option<int>.None(), TestContext.Current.CancellationToken);
 
             result.Should().BeNone();
         });
@@ -422,7 +483,7 @@ public class AsyncEnumerableExtensionsTests
             (var value, var array) = x;
             Option<int> chooser(int x) => x == value ? Option.Some(x) : Option.None;
 
-            var result = await array.Pick(chooser, CancellationToken.None);
+            var result = await array.Pick(chooser, TestContext.Current.CancellationToken);
 
             result.Should().BeSome().Which.Should().Be(value);
         });
@@ -438,7 +499,7 @@ public class AsyncEnumerableExtensionsTests
             var asyncEnumerable = array.ToAsyncEnumerable();
             var f = (int x) => ValueTask.FromResult(Result.Success(x));
 
-            var result = await asyncEnumerable.Traverse(f, CancellationToken.None);
+            var result = await asyncEnumerable.Traverse(f, TestContext.Current.CancellationToken);
 
             result.Should().BeSuccess().Which.Should().BeEquivalentTo(array);
         });
@@ -465,7 +526,7 @@ public class AsyncEnumerableExtensionsTests
                         ? Result.Error<int>(Error.From($"error:{x.index}"))
                         : Result.Success(x.value));
 
-            var result = await asyncEnumerable.Traverse(f, CancellationToken.None);
+            var result = await asyncEnumerable.Traverse(f, TestContext.Current.CancellationToken);
 
             result.Should().BeError().Which.Messages.Should().HaveSameCount(errorIndices);
         });
@@ -488,9 +549,9 @@ public class AsyncEnumerableExtensionsTests
             {
                 ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
                 await ValueTask.CompletedTask;
-            }, maxDegreeOfParallelism: Option.None, CancellationToken.None);
+            }, maxDegreeOfParallelism: Option.None, TestContext.Current.CancellationToken);
 
-            var expected = await array.ToArrayAsync();
+            var expected = await array.ToArrayAsync(TestContext.Current.CancellationToken);
             addedItems.Should().BeEquivalentTo(expected);
         });
     }
@@ -543,7 +604,7 @@ public class AsyncEnumerableExtensionsTests
                     iterations++;
                     await ValueTask.CompletedTask;
                     throw new InvalidOperationException();
-                }, maxDegreesOfParallelism, CancellationToken.None);
+                }, maxDegreesOfParallelism, TestContext.Current.CancellationToken);
             }
             catch (Exception)
             {
@@ -551,6 +612,98 @@ public class AsyncEnumerableExtensionsTests
 #pragma warning restore CA1031 // Do not catch general exception types
 
             iterations.Should().BeLessThanOrEqualTo(maxDegreesOfParallelism);
+        });
+    }
+
+    [Fact]
+    public async Task Tap_executes_side_effect_and_preserves_original_async_enumerable()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            var tapCount = 0;
+
+            var result = await array.ToAsyncEnumerable()
+                                    .Tap(_ => tapCount++)
+                                    .ToArrayAsync(TestContext.Current.CancellationToken);
+
+            result.Should().BeEquivalentTo(array);
+            tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public async Task Tap_is_lazily_evaluated_for_async_enumerable()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            var tapCount = 0;
+
+            // Create the tapped async enumerable but don't enumerate it yet
+            var tappedAsyncEnumerable = array.ToAsyncEnumerable()
+                                             .Tap(_ => tapCount++);
+
+            // Side effect should not have executed yet
+            tapCount.Should().Be(0);
+
+            // Now enumerate it
+            await tappedAsyncEnumerable.ToArrayAsync(TestContext.Current.CancellationToken);
+
+            // Side effect should have executed for each element
+            tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public async Task TapTask_executes_side_effect_and_preserves_original_async_enumerable()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            var tapCount = 0;
+
+            var result = await array.ToAsyncEnumerable()
+                                    .TapTask(async _ =>
+                                    {
+                                        tapCount++;
+                                        await ValueTask.CompletedTask;
+                                    })
+                                    .ToArrayAsync(TestContext.Current.CancellationToken);
+
+            result.Should().BeEquivalentTo(array);
+            tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public async Task TapTask_is_lazily_evaluated_for_async_enumerable()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            var tapCount = 0;
+
+            // Create the tapped async enumerable but don't enumerate it yet
+            var tappedAsyncEnumerable = array.ToAsyncEnumerable()
+                                             .TapTask(async _ =>
+                                             {
+                                                 tapCount++;
+                                                 await ValueTask.CompletedTask;
+                                             });
+
+            // Side effect should not have executed yet
+            tapCount.Should().Be(0);
+
+            // Now enumerate it
+            await tappedAsyncEnumerable.ToArrayAsync(TestContext.Current.CancellationToken);
+
+            // Side effect should have executed for each element
+            tapCount.Should().Be(array.Length);
         });
     }
 }

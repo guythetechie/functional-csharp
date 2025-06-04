@@ -626,6 +626,26 @@ await recipients.IterTask(
 );
 ```
 
+#### `IEnumerable<T> Tap<T>(Action<T> action)`
+Executes a side effect action on each element as it's enumerated, returning the original enumerable unchanged. Useful for debugging, logging, or other side effects in LINQ chains without affecting the data flow.
+
+```csharp
+// Debugging and logging
+List<User> users = GetUsers()
+    .Where(user => user.IsActive)
+    .Tap(user => Console.WriteLine($"Processing user: {user.Name}")) // Log processing
+    .Where(user => user.HasValidEmail)
+    .Tap(user => logger.LogInfo($"Valid user: {user.Id}")) // Additional logging
+    .ToList();
+
+// Chain multiple taps for different concerns
+var processedOrders = orders
+    .Tap(order => auditLogger.Log($"Processing order: {order.Id}"))
+    .Where(order => order.IsValid)
+    .Tap(order => metrics.IncrementCounter("valid_orders"))
+    .Select(order => EnrichOrder(order));
+```
+
 ---
 
 ### AsyncEnumerable Extensions
@@ -709,6 +729,42 @@ await records.IterTask(
 );
 ```
 
+#### `IAsyncEnumerable<T> Tap<T>(Action<T> action)`
+Executes a side effect action on each element as it's enumerated, returning the original async enumerable unchanged. Useful for debugging, logging, or other side effects in async LINQ chains without affecting the data flow.
+
+```csharp
+// Sync logging in async streams
+IAsyncEnumerable<Order> processedOrders = orderStream
+    .Where(order => order.RequiresValidation)
+    .Tap(order => Console.WriteLine($"Validating order: {order.Id}")) // Sync logging
+    .Where(order => order.IsValid)
+    .Tap(order => metrics.IncrementCounter("valid_orders")) // Sync metrics
+    .Select(order => EnrichOrder(order));
+
+await foreach (var order in processedOrders)
+{
+    await ProcessOrderAsync(order);
+}
+```
+
+#### `IAsyncEnumerable<T> TapTask<T>(Func<T, ValueTask> action)`
+Executes an async side effect action on each element as it's enumerated, returning the original async enumerable unchanged. Useful for debugging, logging, or other async side effects in async LINQ chains without affecting the data flow.
+
+```csharp
+// Async logging and monitoring
+IAsyncEnumerable<Order> processedOrders = orderStream
+    .Where(order => order.RequiresValidation)
+    .TapTask(async order => await auditLogger.LogAsync($"Validating order: {order.Id}")) // Async logging
+    .Where(order => order.IsValid)
+    .TapTask(async order => await notificationService.NotifyAsync(order.CustomerId)) // Async notifications
+    .Select(order => EnrichOrder(order));
+
+// Chain sync and async taps
+await foreach (var order in processedOrders)
+{
+    await ProcessOrderAsync(order);
+}
+```
 ---
 
 ### Dictionary Extensions
