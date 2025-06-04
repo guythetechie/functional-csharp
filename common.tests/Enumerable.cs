@@ -407,6 +407,25 @@ public class EnumerableExtensionsTests
             secondTapCount.Should().Be(array.Length);
         });
     }
+
+    [Fact]
+    public void Unzip_unzips_items()
+    {
+        var gen = from firstArray in Gen.Int.Array
+                  from secondArray in Gen.String.Array[firstArray.Length]
+                  select (firstArray, secondArray);
+
+        gen.Sample(x =>
+        {
+            var (firstArray, secondArray) = x;
+            var zippedArray = firstArray.Zip(secondArray);
+
+            var (firstResult, secondResult) = zippedArray.Unzip();
+
+            firstResult.Should().BeEquivalentTo(firstArray);
+            secondResult.Should().BeEquivalentTo(secondArray);
+        });
+    }
 }
 
 public class AsyncEnumerableExtensionsTests
@@ -771,6 +790,26 @@ public class AsyncEnumerableExtensionsTests
 
             // Side effect should have executed for each element
             tapCount.Should().Be(array.Length);
+        });
+    }
+
+    [Fact]
+    public async Task Unzip_unzips_items()
+    {
+        var gen = from firstArray in Gen.Int.Array
+                  from secondArray in Gen.String.Array[firstArray.Length]
+                  select (firstArray, secondArray);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (firstArray, secondArray) = x;
+            var zippedArray = firstArray.Zip(secondArray)
+                                        .ToAsyncEnumerable();
+
+            var (firstResult, secondResult) = await zippedArray.Unzip(TestContext.Current.CancellationToken);
+
+            firstResult.Should().BeEquivalentTo(firstArray);
+            secondResult.Should().BeEquivalentTo(secondArray);
         });
     }
 }

@@ -609,6 +609,30 @@ Option<ImmutableArray<int>> failedParsing = mixedInputs.Traverse(
 ); // None
 ```
 
+#### `(ImmutableArray<T1>, ImmutableArray<T2>) Unzip<T1, T2>()`
+Separates an enumerable of tuples into a tuple of immutable arrays. This is the inverse operation of `Zip`.
+
+```csharp
+// Split coordinate pairs into separate x and y collections
+var coordinates = new[] { (1, 10), (2, 20), (3, 30), (4, 40) };
+var (xValues, yValues) = coordinates.Unzip();
+
+// xValues: [1, 2, 3, 4]
+// yValues: [10, 20, 30, 40]
+
+// Split names and ages from user data
+var users = new[] { ("Alice", 25), ("Bob", 30), ("Charlie", 35) };
+var (names, ages) = users.Unzip();
+
+Console.WriteLine($"Names: {string.Join(", ", names)}");     // Names: Alice, Bob, Charlie
+Console.WriteLine($"Ages: {string.Join(", ", ages)}");       // Ages: 25, 30, 35
+
+// Works with any tuple types
+var dataPoints = new[] { ("A", 1.5), ("B", 2.0), ("C", 3.5) };
+var (labels, values) = dataPoints.Unzip();
+// labels: ["A", "B", "C"], values: [1.5, 2.0, 3.5]
+```
+
 #### `void Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
 Executes an action on each element in parallel.
 
@@ -751,6 +775,27 @@ downloadResult.Match(
     files => Console.WriteLine($"Successfully downloaded {files.Length} files"),
     () => Console.WriteLine("One or more downloads failed")
 );
+```
+
+#### `ValueTask<(ImmutableArray<T1>, ImmutableArray<T2>)> Unzip<T1, T2>(CancellationToken cancellationToken)`
+Asynchronously separates an async enumerable of tuples into a tuple of immutable arrays. This is the async version of the synchronous Unzip operation.
+
+```csharp
+// Process streaming coordinate data
+IAsyncEnumerable<(int X, int Y)> coordinateStream = GetCoordinateStreamAsync();
+var (xValues, yValues) = await coordinateStream.Unzip(cancellationToken);
+
+// Process async user data stream
+IAsyncEnumerable<(string Name, int Age)> userStream = GetUserStreamAsync();
+var (names, ages) = await userStream.Unzip(cancellationToken);
+
+Console.WriteLine($"Names: {string.Join(", ", names)}");
+Console.WriteLine($"Ages: {string.Join(", ", ages)}");
+
+// Works with any async tuple stream
+IAsyncEnumerable<(string Label, double Value)> dataStream = GetDataPointStreamAsync();
+var (labels, values) = await dataStream.Unzip(cancellationToken);
+// labels: ImmutableArray<string>, values: ImmutableArray<double>
 ```
 
 #### `ValueTask IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`

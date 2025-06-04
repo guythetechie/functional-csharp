@@ -94,6 +94,23 @@ public static class EnumerableExtensions
             action(item);
             return item;
         });
+
+    /// <summary>
+    /// Separates an enumerable of tuples into a tuple of immutable arrays.
+    /// </summary>
+    public static (ImmutableArray<T1>, ImmutableArray<T2>) Unzip<T1, T2>(this IEnumerable<(T1, T2)> source)
+    {
+        var list1 = new List<T1>();
+        var list2 = new List<T2>();
+
+        foreach (var (item1, item2) in source)
+        {
+            list1.Add(item1);
+            list2.Add(item2);
+        }
+
+        return ([.. list1], [.. list2]);
+    }
 }
 
 public static class AsyncEnumerableExtensions
@@ -193,6 +210,23 @@ public static class AsyncEnumerableExtensions
             await action(item);
             return item;
         });
+
+    /// <summary>
+    /// Separates an async enumerable of tuples into a tuple of immutable arrays.
+    /// </summary>
+    public static async ValueTask<(ImmutableArray<T1>, ImmutableArray<T2>)> Unzip<T1, T2>(this IAsyncEnumerable<(T1, T2)> source, CancellationToken cancellationToken)
+    {
+        var list1 = new List<T1>();
+        var list2 = new List<T2>();
+
+        await foreach (var (item1, item2) in source.WithCancellation(cancellationToken))
+        {
+            list1.Add(item1);
+            list2.Add(item2);
+        }
+
+        return ([.. list1], [.. list2]);
+    }
 }
 
 public static class DictionaryExtensions
