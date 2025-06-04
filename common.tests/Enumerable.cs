@@ -155,6 +155,38 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void Traverse_with_all_some_returns_some_with_expected_array()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            var f = (int x) => Option.Some(x);
+            var result = array.Traverse(f, TestContext.Current.CancellationToken);
+            result.Should().BeSome().Which.Should().BeEquivalentTo(array);
+        });
+    }
+
+    [Fact]
+    public void Traverse_with_none_returns_none()
+    {
+        var gen = from array in Gen.Int.Array
+                  from oddNumber in Gen.Int.Where(x => x % 2 != 0)
+                  let arrayWithOdd = array.Append(oddNumber).ToArray()
+                  from shuffledArray in Gen.Shuffle(arrayWithOdd)
+                  select shuffledArray;
+
+        gen.Sample(array =>
+        {
+            var f = (int x) => x % 2 == 0 ? Option.Some(x) : Option.None;
+
+            var result = array.Traverse(f, TestContext.Current.CancellationToken);
+
+            result.Should().BeNone();
+        });
+    }
+
+    [Fact]
     public void Iter_calls_action_for_each_element()
     {
         var gen = from array in Gen.Int.Array
@@ -529,6 +561,41 @@ public class AsyncEnumerableExtensionsTests
             var result = await asyncEnumerable.Traverse(f, TestContext.Current.CancellationToken);
 
             result.Should().BeError().Which.Messages.Should().HaveSameCount(errorIndices);
+        });
+    }
+
+    [Fact]
+    public async Task Traverse_with_all_some_returns_some_with_expected_array()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            var asyncEnumerable = array.ToAsyncEnumerable();
+            var f = (int x) => ValueTask.FromResult(Option.Some(x));
+
+            var result = await asyncEnumerable.Traverse(f, TestContext.Current.CancellationToken);
+
+            result.Should().BeSome().Which.Should().BeEquivalentTo(array);
+        });
+    }
+
+    [Fact]
+    public async Task Traverse_with_none_returns_none()
+    {
+        var gen = from array in Gen.Int.Array
+                  from oddNumber in Gen.Int.Where(x => x % 2 != 0)
+                  let arrayWithOdd = array.Append(oddNumber).ToArray()
+                  from shuffledArray in Gen.Shuffle(arrayWithOdd)
+                  select shuffledArray.ToAsyncEnumerable();
+
+        await gen.SampleAsync(async asyncEnumerable =>
+        {
+            var f = (int x) => ValueTask.FromResult(x % 2 == 0 ? Option.Some(x) : Option.None);
+
+            var result = await asyncEnumerable.Traverse(f, TestContext.Current.CancellationToken);
+
+            result.Should().BeNone();
         });
     }
 

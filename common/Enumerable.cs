@@ -54,6 +54,20 @@ public static class EnumerableExtensions
                 : Result.Success(results.ToImmutableArray());
     }
 
+    public static Option<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Option<T2>> selector, CancellationToken cancellationToken)
+    {
+        var results = new List<T2>();
+        var hasNone = false;
+
+        source.Iter(item => selector(item).Match(results.Add, () => hasNone = true),
+                    maxDegreeOfParallelism: 1,
+                    cancellationToken);
+
+        return hasNone
+                ? Option.None
+                : Option.Some(results.ToImmutableArray());
+    }
+
     public static void Iter<T>(this IEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
@@ -130,6 +144,24 @@ public static class AsyncEnumerableExtensions
         return errors.Count > 0
                 ? errors.Aggregate((first, second) => first + second)
                 : Result.Success(results.ToImmutableArray());
+    }
+
+    public static async ValueTask<Option<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Option<T2>>> selector, CancellationToken cancellationToken)
+    {
+        var results = new List<T2>();
+        var hasNone = false;
+
+        await source.IterTask(async item =>
+                              {
+                                  var option = await selector(item);
+                                  option.Match(results.Add, () => hasNone = true);
+                              },
+                              maxDegreeOfParallelism: 1,
+                              cancellationToken);
+
+        return hasNone
+                ? Option.None
+                : Option.Some(results.ToImmutableArray());
     }
 
     public static async ValueTask IterTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)

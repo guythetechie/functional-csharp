@@ -590,6 +590,25 @@ Result<ImmutableArray<Email>> failedValidation = mixedInputs.Traverse(
 ); // Error("Invalid email: invalid-email", "Invalid email: bad-format")
 ```
 
+#### `Option<ImmutableArray<T2>> Traverse<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
+Applies an operation returning an `Option<T2>` to each element, returning `Some` if all succeed or `None` if any fail.
+
+```csharp
+// Parse all numbers - succeeds only if all are valid
+string[] numberStrings = { "42", "123", "999" };
+Option<ImmutableArray<int>> parsedNumbers = numberStrings.Traverse(
+    input => int.TryParse(input, out var result) ? Option.Some(result) : Option.None,
+    CancellationToken.None
+); // Some([42, 123, 999])
+
+// If any parsing fails, the entire operation returns None
+string[] mixedInputs = { "42", "invalid", "123" };
+Option<ImmutableArray<int>> failedParsing = mixedInputs.Traverse(
+    input => int.TryParse(input, out var result) ? Option.Some(result) : Option.None,
+    CancellationToken.None
+); // None
+```
+
 #### `void Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
 Executes an action on each element in parallel.
 
@@ -713,6 +732,24 @@ Result<ImmutableArray<ValidatedFile>> validationResult =
 validationResult.Match(
     validFiles => Console.WriteLine($"All {validFiles.Length} files are valid"),
     errors => Console.WriteLine($"Validation failed: {errors}")
+);
+```
+
+#### `ValueTask<Option<ImmutableArray<T2>>> Traverse<T, T2>(Func<T, ValueTask<Option<T2>>> selector, CancellationToken cancellationToken)`
+Applies an async operation returning `ValueTask<Option<T2>>` to each element, returning `Some` if all succeed or `None` if any fail.
+
+```csharp
+// Process file downloads asynchronously - succeeds only if all downloads complete
+IAsyncEnumerable<string> urls = GetDownloadUrls();
+Option<ImmutableArray<DownloadedFile>> downloadResult =
+    await urls.Traverse(
+        async url => await TryDownloadFileAsync(url), // Returns Option<DownloadedFile>
+        CancellationToken.None
+    );
+
+downloadResult.Match(
+    files => Console.WriteLine($"Successfully downloaded {files.Length} files"),
+    () => Console.WriteLine("One or more downloads failed")
 );
 ```
 
