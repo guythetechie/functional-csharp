@@ -6,10 +6,7 @@ namespace common;
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
 /// <summary>
-/// Represents an optional value.
-/// With nullable reference types enabled:
-/// - For non-nullable reference types (e.g., string), <c>Option.Some(null)</c> is a compile-time error.
-/// - For nullable types (e.g., string?), <c>Option.Some(null)</c> is treated as <c>None</c>.
+/// Represents an optional value that may or may not contain a value.
 /// </summary>
 public sealed record Option<T>
 #pragma warning restore CA1716 // Identifiers should not match keywords
@@ -29,12 +26,12 @@ public sealed record Option<T>
     }
 
     /// <summary>
-    /// Returns whether this option contains no value.
+    /// Gets whether this option contains no value.
     /// </summary>
     public bool IsNone => !isSome;
 
     /// <summary>
-    /// Returns whether this option contains a value.
+    /// Gets whether this option contains a value.
     /// </summary>
     public bool IsSome => isSome;
 
@@ -43,7 +40,7 @@ public sealed record Option<T>
         new(value);
 
     /// <summary>
-    /// Creates an option with no value.
+    /// Creates an empty option.
     /// </summary>
     /// <returns>An option representing no value.</returns>
     public static Option<T> None() =>
@@ -68,7 +65,7 @@ public sealed record Option<T>
         : EqualityComparer<T?>.Default.GetHashCode(value);
 
     /// <summary>
-    /// Pattern matches on the option, executing the appropriate function.
+    /// Pattern matches on the option state.
     /// </summary>
     /// <typeparam name="T2">The return type.</typeparam>
     /// <param name="some">Function executed if the option contains a value.</param>
@@ -78,7 +75,7 @@ public sealed record Option<T>
         IsSome ? some(value!) : none();
 
     /// <summary>
-    /// Pattern matches on the option for side effects.
+    /// Pattern matches on the option state for side effects.
     /// </summary>
     /// <param name="some">Action executed if the option contains a value.</param>
     /// <param name="none">Action executed if the option is empty.</param>
@@ -119,7 +116,7 @@ public static class Option
 #pragma warning restore CA1716 // Identifiers should not match keywords
 {
     /// <summary>
-    /// Creates an option containing the specified value.
+    /// Creates an option containing a value.
     /// </summary>
     /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="value">The value to wrap.</param>
@@ -133,36 +130,36 @@ public static class Option
     public static None None { get; }
 
     /// <summary>
-    /// Filters an option based on a predicate.
+    /// Filters an option using a predicate.
     /// </summary>
-    /// <typeparam name="T">The option value type.</typeparam>
+    /// <typeparam name="T">The value type.</typeparam>
     /// <param name="option">The option to filter.</param>
     /// <param name="predicate">The predicate function.</param>
-    /// <returns>The option if it contains a value that satisfies the predicate, otherwise None.</returns>
+    /// <returns>The option if it satisfies the predicate, otherwise None.</returns>
     public static Option<T> Where<T>(this Option<T> option, Func<T, bool> predicate) =>
         option.Match(t => predicate(t) ? option : None,
                      () => None);
 
     /// <summary>
-    /// Transforms the option value using the specified function.
+    /// Transforms the option value using a function.
     /// </summary>
     /// <typeparam name="T">The source value type.</typeparam>
     /// <typeparam name="T2">The result value type.</typeparam>
     /// <param name="option">The option to transform.</param>
     /// <param name="f">The transformation function.</param>
-    /// <returns>Some(f(value)) if the option contains a value, otherwise None.</returns>
+    /// <returns>Some(f(value)) if Some, otherwise None.</returns>
     public static Option<T2> Map<T, T2>(this Option<T> option, Func<T, T2> f) =>
         option.Match(t => Some(f(t)),
                      () => None);
 
     /// <summary>
-    /// Applies an option-returning function to the option value.
+    /// Chains option operations together (monadic bind).
     /// </summary>
     /// <typeparam name="T">The source value type.</typeparam>
     /// <typeparam name="T2">The result value type.</typeparam>
     /// <param name="option">The option to bind.</param>
     /// <param name="f">The function that returns an option.</param>
-    /// <returns>f(value) if the option contains a value, otherwise None.</returns>
+    /// <returns>f(value) if Some, otherwise None.</returns>
     public static Option<T2> Bind<T, T2>(this Option<T> option, Func<T, Option<T2>> f) =>
         option.Match(t => f(t),
                      () => None);
@@ -193,29 +190,29 @@ public static class Option
         option.Bind(t => f(t).Map(t2 => selector(t, t2)));
 
     /// <summary>
-    /// Returns the option value or a default value if None.
+    /// Provides a fallback value for empty options.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="option">The option to check.</param>
     /// <param name="f">Function that provides the default value.</param>
-    /// <returns>The option value if present, otherwise the default value.</returns>
+    /// <returns>The option value if Some, otherwise the default value.</returns>
     public static T IfNone<T>(this Option<T> option, Func<T> f) =>
         option.Match(t => t,
                      f);
 
     /// <summary>
-    /// Returns the option or a fallback option if None.
+    /// Provides a fallback option for empty options.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="option">The option to check.</param>
     /// <param name="f">Function that provides the fallback option.</param>
-    /// <returns>The original option if Some, otherwise the fallback option.</returns>
+    /// <returns>The original option if Some, otherwise the fallback.</returns>
     public static Option<T> IfNone<T>(this Option<T> option, Func<Option<T>> f) =>
         option.Match(t => option,
                      f);
 
     /// <summary>
-    /// Returns the option value or throws an exception if None.
+    /// Extracts the option value or throws an exception.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="option">The option to check.</param>
@@ -231,7 +228,7 @@ public static class Option
     /// </summary>
     /// <typeparam name="T">The reference type.</typeparam>
     /// <param name="option">The option to convert.</param>
-    /// <returns>The option value if present, otherwise null.</returns>
+    /// <returns>The option value if Some, otherwise null.</returns>
     public static T? IfNoneNull<T>(this Option<T> option) where T : class =>
     option.Match(t => (T?)t,
                  () => null);
@@ -241,7 +238,7 @@ public static class Option
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="option">The option to convert.</param>
-    /// <returns>The option value if present, otherwise null.</returns>
+    /// <returns>The option value if Some, otherwise null.</returns>
     public static T? IfNoneNullable<T>(this Option<T> option) where T : struct =>
         option.Match(t => (T?)t,
                      () => null);

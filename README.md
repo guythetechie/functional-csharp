@@ -36,7 +36,7 @@ Option<string> fromNone = Option.None;   // None
 ```
 
 #### `T2 Match<T2>(Func<T, T2> some, Func<T2> none)`
-Pattern matches on the option, executing the appropriate function.
+Pattern matches on the option state.
 
 ```csharp
 Option<string> userEmail = GetUserEmail(userId);
@@ -47,7 +47,7 @@ string displayText = userEmail.Match(
 ```
 
 #### `void Match(Action<T> some, Action none)`
-Pattern matches on the option for side effects.
+Pattern matches on the option state for side effects.
 
 ```csharp
 Option<User> currentUser = GetCurrentUser();
@@ -58,7 +58,7 @@ currentUser.Match(
 ```
 
 #### `Option<T2> Map<T2>(Func<T, T2> mapper)`
-Transforms the option value using the specified function.
+Transforms the option value using a function.
 
 ```csharp
 Option<string> userInput = GetUserInput();
@@ -71,7 +71,7 @@ Option<decimal> tax = price.Map(p => decimal.Parse(p))
 ```
 
 #### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
-Applies an option-returning function to the option value.
+Chains option operations together (monadic bind).
 
 ```csharp
 Option<string> userId = Option.Some("123");
@@ -85,7 +85,7 @@ static Option<User> FindUserById(string id) =>
 ```
 
 #### `Option<T> Where(Func<T, bool> predicate)`
-Filters an option based on a predicate.
+Filters an option using a predicate.
 
 ```csharp
 Option<int> userAge = Option.Some(17);
@@ -112,7 +112,7 @@ orderSummary.Match(
 ```
 
 #### `T IfNone(Func<T> defaultProvider)`
-Returns the option value or a default value if None.
+Provides a fallback value for empty options.
 
 ```csharp
 Option<string> userName = GetUserName();
@@ -120,7 +120,7 @@ string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
 #### `Option<T> IfNone(Func<Option<T>> fallbackProvider)`
-Returns the option or a fallback option if None.
+Provides a fallback option for empty options.
 
 ```csharp
 Option<Config> primaryConfig = LoadPrimaryConfig();
@@ -138,7 +138,7 @@ user.Match(
 ```
 
 #### `T IfNoneThrow(Func<Exception> getException)`
-Returns the option value or throws an exception if None.
+Extracts the option value or throws an exception.
 
 ```csharp
 Option<DatabaseConnection> connection = EstablishConnection();
@@ -200,7 +200,7 @@ Result<string> fromError = Error.From("failure");       // Error
 ```
 
 #### `TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onError)`
-Pattern matches on the result, executing the appropriate function.
+Pattern matches on the result state.
 
 ```csharp
 Result<User> userResult = AuthenticateUser(credentials);
@@ -211,7 +211,7 @@ string message = userResult.Match(
 ```
 
 #### `void Match(Action<T> onSuccess, Action<Error> onError)`
-Pattern matches for side effects without returning a value.
+Pattern matches on the result state for side effects.
 
 ```csharp
 Result<Order> orderResult = ProcessOrder(orderRequest);
@@ -222,7 +222,7 @@ orderResult.Match(
 ```
 
 #### `Result<T2> Map<T2>(Func<T, T2> mapper)`
-Transforms the success value, otherwise preserves the error.
+Transforms the success value using a function.
 
 ```csharp
 Result<string> userInput = ValidateInput(request);
@@ -248,7 +248,7 @@ Result<ConfigFile> contextualError = configResult.MapError(error =>
 ```
 
 #### `Result<T2> Bind<T2>(Func<T, Result<T2>> binder)`
-Chains operations that return Results, allowing for sequential error handling.
+Chains result operations together (monadic bind).
 
 ```csharp
 // Chain validation and processing steps
@@ -274,7 +274,7 @@ result.Match(
 ```
 
 #### `T IfError(Func<Error, T> errorHandler)`
-Provides a fallback value when the result is an error.
+Provides a fallback value for error results.
 
 ```csharp
 Result<User> userResult = GetUser(userId);
@@ -282,7 +282,7 @@ User user = userResult.IfError(error => new User("Guest"));
 ```
 
 #### `Result<T> IfError(Func<Error, Result<T>> errorHandler)`
-Provides a fallback Result when the current result is an error. This allows for chaining error recovery operations that might themselves fail.
+Provides a fallback result for error results. This allows for chaining error recovery operations that might themselves fail.
 
 ```csharp
 Result<User> userResult = GetUser(userId);
@@ -296,7 +296,7 @@ Result<Config> configResult = LoadPrimaryConfig()
 ```
 
 #### `T IfErrorThrow()`
-Throws an exception when the result is an error.
+Extracts the success value or throws the error as an exception.
 
 ```csharp
 Result<DatabaseConnection> connectionResult = ConnectToDatabase();
@@ -367,7 +367,7 @@ Either<CachedData, FreshData> freshResult = Either.Right<CachedData, FreshData>(
 ```
 
 #### `T Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight)`
-Pattern matches on the either, executing the appropriate function.
+Pattern matches on the either state.
 
 ```csharp
 Either<DatabaseResult, CacheResult> dataSource = GetData(useCache: true);
@@ -378,7 +378,7 @@ string sourceInfo = dataSource.Match(
 ```
 
 #### `void Match(Action<TLeft> onLeft, Action<TRight> onRight)`
-Pattern matches for side effects without returning a value.
+Pattern matches on the either state for side effects.
 
 ```csharp
 Either<EmailNotification, SmsNotification> notification = ChooseNotificationMethod(user);
@@ -389,7 +389,7 @@ notification.Match(
 ```
 
 #### `Either<TLeft, TRight2> Map<TRight2>(Func<TRight, TRight2> mapper)`
-Transforms the right value, otherwise preserves the left value.
+Transforms the right value using a function.
 
 ```csharp
 Either<ErrorMessage, UserData> userData = LoadUserData(userId);
@@ -401,7 +401,7 @@ Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName);
 ```
 
 #### `Either<TLeft, TRight2> Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
-Chains operations that return Either values.
+Chains either operations together (monadic bind).
 
 ```csharp
 // Try local cache then fallback to remote
@@ -427,7 +427,7 @@ var result = from source in DetermineDataSource(config)
 ```
 
 #### `TRight IfLeft(Func<TLeft, TRight> leftHandler)`
-Provides a right value when the either contains a left value.
+Extracts the right value or converts the left value.
 
 ```csharp
 Either<DefaultConfig, CustomConfig> configChoice = LoadUserConfig();
@@ -435,7 +435,7 @@ CustomConfig finalConfig = configChoice.IfLeft(defaultCfg => ConvertToCustomConf
 ```
 
 #### `TLeft IfRight(Func<TRight, TLeft> rightHandler)`
-Provides a left value when the either contains a right value.
+Extracts the left value or converts the right value.
 
 ```csharp
 Either<BasicPlan, PremiumPlan> userPlan = Either.Right<BasicPlan, PremiumPlan>(premiumFeatures);
@@ -443,7 +443,7 @@ BasicPlan planForLogging = userPlan.IfRight(premium => CreateBasicSummary(premiu
 ```
 
 #### `TRight IfLeftThrow(Exception exception)`
-Throws an exception when the either contains a left value.
+Extracts the right value or throws an exception.
 
 ```csharp
 Either<TrialVersion, FullVersion> softwareVersion = CheckLicense();
@@ -451,7 +451,7 @@ FullVersion licensed = softwareVersion.IfLeftThrow(new InvalidOperationException
 ```
 
 #### `TLeft IfRightThrow(Exception exception)`
-Throws an exception when the either contains a right value.
+Extracts the left value or throws an exception.
 
 ```csharp
 Either<BasicPlan, PremiumPlan> userPlan = Either.Left<BasicPlan, PremiumPlan>(basicFeatures);
@@ -539,7 +539,7 @@ Exception originalException = fileError.ToException(); // The original FileNotFo
 Provides extension methods for working with `IEnumerable<T>` in a functional style.
 
 #### `Option<T> Head<T>()`
-Returns the first element as an Option, or None if the sequence is empty.
+Gets the first element of the sequence as an option.
 
 ```csharp
 List<Customer> customers = GetActiveCustomers();
@@ -556,7 +556,7 @@ Option<int> firstNumber = numbers.Head(); // None (instead of throwing an except
 ```
 
 #### `IEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
-Applies a function to each element and returns only the successful transformations.
+Filters and transforms elements using an option-returning selector.
 
 ```csharp
 // Parse valid integers from mixed input
@@ -568,7 +568,7 @@ validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Ou
 ```
 
 #### `Option<T2> Pick<T, T2>(Func<T, Option<T2>> selector)`
-Returns the first successful transformation, or None if no element produces a Some value.
+Finds the first element that produces a Some value when transformed.
 
 ```csharp
 // Find the first valid configuration file
@@ -712,7 +712,7 @@ var processedOrders = orders
 Provides extension methods for working with `IAsyncEnumerable<T>` in a functional style.
 
 #### `ValueTask<Option<T>> Head<T>(CancellationToken cancellationToken)`
-Returns the first element as an Option asynchronously.
+Gets the first element of the async sequence as an option.
 
 ```csharp
 IAsyncEnumerable<LogEntry> logStream = GetLogStreamAsync();
@@ -725,7 +725,7 @@ firstEntry.Match(
 ```
 
 #### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
-Applies a function to each element and returns only the successful transformations.
+Filters and transforms async elements using an option-returning selector.
 
 ```csharp
 // Filter and transform streaming data
@@ -745,7 +745,7 @@ await validEntries.IterTask(async entry => {
 ```
 
 #### `ValueTask<Option<T2>> Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
-Returns the first successful transformation asynchronously, or None if no element produces a Some value.
+Finds the first async element that produces a Some value when transformed.
 
 ```csharp
 // Find the first valid data record in a stream
@@ -868,7 +868,7 @@ await foreach (var order in processedOrders)
 ### Dictionary Extensions
 
 #### `Option<TValue> Find<TKey, TValue>(TKey key)`
-Safely retrieves a value from a dictionary, returning an Option.
+Safely retrieves a value from a dictionary.
 
 ```csharp
 // Safe configuration lookup with fallback

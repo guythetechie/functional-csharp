@@ -26,12 +26,12 @@ public sealed record Result<T>
     }
 
     /// <summary>
-    /// Returns whether this result represents a success.
+    /// Gets whether this result represents a success.
     /// </summary>
     public bool IsSuccess => isSuccess;
 
     /// <summary>
-    /// Returns whether this result represents an error.
+    /// Gets whether this result represents an error.
     /// </summary>
     public bool IsError => isSuccess is false;
 
@@ -44,7 +44,7 @@ public sealed record Result<T>
 #pragma warning restore CA1000 // Do not declare static members on generic types
 
     /// <summary>
-    /// Pattern matches on the result, executing the appropriate function.
+    /// Pattern matches on the result state.
     /// </summary>
     /// <typeparam name="TResult">The return type.</typeparam>
     /// <param name="onSuccess">Function executed if the result is successful.</param>
@@ -54,7 +54,7 @@ public sealed record Result<T>
         IsSuccess ? onSuccess(value!) : onError(error!);
 
     /// <summary>
-    /// Pattern matches on the result for side effects.
+    /// Pattern matches on the result state for side effects.
     /// </summary>
     /// <param name="onSuccess">Action executed if the result is successful.</param>
     /// <param name="onError">Action executed if the result is an error.</param>
@@ -106,7 +106,7 @@ public sealed record Result<T>
 public static class Result
 {
     /// <summary>
-    /// Creates a successful result containing the specified value.
+    /// Creates a successful result containing a value.
     /// </summary>
     /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="value">The value to wrap.</param>
@@ -115,7 +115,7 @@ public static class Result
         Result<T>.Success(value);
 
     /// <summary>
-    /// Creates an error result containing the specified error.
+    /// Creates an error result containing an error.
     /// </summary>
     /// <typeparam name="T">The type of the value.</typeparam>
     /// <param name="error">The error to wrap.</param>
@@ -124,13 +124,13 @@ public static class Result
         Result<T>.Error(error);
 
     /// <summary>
-    /// Transforms the success value, preserving any error.
+    /// Transforms the success value using a function.
     /// </summary>
     /// <typeparam name="T">The source value type.</typeparam>
     /// <typeparam name="T2">The result value type.</typeparam>
     /// <param name="result">The result to transform.</param>
     /// <param name="f">The transformation function.</param>
-    /// <returns>Success(f(value)) if the result is successful, otherwise the original error.</returns>
+    /// <returns>Success(f(value)) if successful, otherwise the original error.</returns>
     public static Result<T2> Map<T, T2>(this Result<T> result, Func<T, T2> f) =>
         result.Match(value => Success(f(value)),
                      error => Error<T2>(error));
@@ -141,19 +141,19 @@ public static class Result
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="result">The result to transform.</param>
     /// <param name="f">The error transformation function.</param>
-    /// <returns>The original success value, or Error(f(error)) if the result is an error.</returns>
+    /// <returns>The original success, or Error(f(error)) if error.</returns>
     public static Result<T> MapError<T>(this Result<T> result, Func<Error, Error> f) =>
         result.Match(value => Success(value),
                      error => Error<T>(f(error)));
 
     /// <summary>
-    /// Applies a result-returning function to the success value.
+    /// Chains result operations together (monadic bind).
     /// </summary>
     /// <typeparam name="T">The source value type.</typeparam>
     /// <typeparam name="T2">The result value type.</typeparam>
     /// <param name="result">The result to bind.</param>
     /// <param name="f">The function that returns a result.</param>
-    /// <returns>f(value) if the result is successful, otherwise the original error.</returns>
+    /// <returns>f(value) if successful, otherwise the original error.</returns>
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
         result.Match(value => f(value),
                      error => Error<T2>(error));
@@ -185,23 +185,23 @@ public static class Result
               .Map(value2 => selector(value, value2)));
 
     /// <summary>
-    /// Returns the success value or a fallback value if error.
+    /// Provides a fallback value for error results.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="result">The result to check.</param>
     /// <param name="f">Function that provides the fallback value.</param>
-    /// <returns>The success value if present, otherwise the fallback value.</returns>
+    /// <returns>The success value if successful, otherwise the fallback value.</returns>
     public static T IfError<T>(this Result<T> result, Func<Error, T> f) =>
         result.Match(value => value,
                      f);
 
     /// <summary>
-    /// Returns the result or a fallback result if error.
+    /// Provides a fallback result for error results.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="result">The result to check.</param>
     /// <param name="f">Function that provides the fallback result.</param>
-    /// <returns>The original result if successful, otherwise the fallback result.</returns>
+    /// <returns>The original result if successful, otherwise the fallback.</returns>
     public static Result<T> IfError<T>(this Result<T> result, Func<Error, Result<T>> f) =>
         result.Match(_ => result,
                      f);
@@ -228,7 +228,7 @@ public static class Result
                                       _ => ValueTask.CompletedTask);
 
     /// <summary>
-    /// Returns the success value or throws the error as an exception.
+    /// Extracts the success value or throws the error as an exception.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="result">The result to check.</param>
@@ -243,7 +243,7 @@ public static class Result
     /// </summary>
     /// <typeparam name="T">The reference type.</typeparam>
     /// <param name="result">The result to convert.</param>
-    /// <returns>The success value if present, otherwise null.</returns>
+    /// <returns>The success value if successful, otherwise null.</returns>
     public static T? IfErrorNull<T>(this Result<T> result) where T : class =>
         result.Match(value => (T?)value,
                      _ => null);
@@ -253,7 +253,7 @@ public static class Result
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
     /// <param name="result">The result to convert.</param>
-    /// <returns>The success value if present, otherwise null.</returns>
+    /// <returns>The success value if successful, otherwise null.</returns>
     public static T? IfErrorNullable<T>(this Result<T> result) where T : struct =>
         result.Match(value => (T?)value,
                      _ => null);

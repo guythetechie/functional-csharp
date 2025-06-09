@@ -6,6 +6,9 @@ using System.Linq;
 namespace common;
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
+/// <summary>
+/// Represents an error containing one or more messages.
+/// </summary>
 public record Error
 #pragma warning restore CA1716 // Identifiers should not match keywords
 {
