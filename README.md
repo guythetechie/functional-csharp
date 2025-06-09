@@ -9,13 +9,13 @@ A minimal set of functional programming classes for C#. Copy any class you need 
 | Type | Description |
 |------|-------------|
 | [Option&lt;T&gt;](#optiont) | Represents an optional value that may or may not exist |
-| [Result&lt;T&gt;](#resultt) | Represents the result of an operation that can succeed or fail |
-| [Either&lt;TLeft, TRight&gt;](#eithertleft-tright) | Represents a value that can be one of two types |
+| [Result&lt;T&gt;](#resultt) | Represents the result of an operation that can either succeed with a value or fail with an error |
+| [Either&lt;TLeft, TRight&gt;](#eithertleft-tright) | Represents a value that can be one of two types, either left or right |
 | [Error](#error) | Represents error information with multiple messages or exceptions |
 | [Unit](#unit) | Represents the absence of a meaningful value (functional equivalent of void) |
-| [Enumerable Extensions](#enumerable-extensions) | Extensions for working with `IEnumerable<T>` |
-| [AsyncEnumerable Extensions](#asyncenumerable-extensions) | Extensions for working with `IAsyncEnumerable<T>` |
-| [Dictionary Extensions](#dictionary-extensions) | Extensions for safe dictionary operations |
+| [Enumerable Extensions](#enumerable-extensions) | Provides extension methods for working with IEnumerable&lt;T&gt; in a functional style |
+| [AsyncEnumerable Extensions](#asyncenumerable-extensions) | Provides extension methods for working with IAsyncEnumerable&lt;T&gt; in a functional style |
+| [Dictionary Extensions](#dictionary-extensions) | Provides extension methods for safe dictionary operations |
 
 ### Option&lt;T&gt;
 
@@ -47,7 +47,7 @@ string displayText = userEmail.Match(
 ```
 
 #### `void Match(Action<T> some, Action none)`
-Pattern matches for side effects without returning a value.
+Pattern matches on the option for side effects.
 
 ```csharp
 Option<User> currentUser = GetCurrentUser();
@@ -58,7 +58,7 @@ currentUser.Match(
 ```
 
 #### `Option<T2> Map<T2>(Func<T, T2> mapper)`
-Transforms the value if present, otherwise returns None.
+Transforms the option value using the specified function.
 
 ```csharp
 Option<string> userInput = GetUserInput();
@@ -71,7 +71,7 @@ Option<decimal> tax = price.Map(p => decimal.Parse(p))
 ```
 
 #### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
-Applies an Option-returning function to the value. If the value is not present, returns None.
+Applies an option-returning function to the option value.
 
 ```csharp
 Option<string> userId = Option.Some("123");
@@ -85,7 +85,7 @@ static Option<User> FindUserById(string id) =>
 ```
 
 #### `Option<T> Where(Func<T, bool> predicate)`
-Filters the option based on a predicate. Returns None if there is no value, or if the predicate is false.
+Filters an option based on a predicate.
 
 ```csharp
 Option<int> userAge = Option.Some(17);
@@ -112,7 +112,7 @@ orderSummary.Match(
 ```
 
 #### `T IfNone(Func<T> defaultProvider)`
-Provides a default value when the option is None.
+Returns the option value or a default value if None.
 
 ```csharp
 Option<string> userName = GetUserName();
@@ -120,7 +120,7 @@ string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
 #### `Option<T> IfNone(Func<Option<T>> fallbackProvider)`
-Provides a fallback Option when the current option is None. This allows for chaining multiple optional sources.
+Returns the option or a fallback option if None.
 
 ```csharp
 Option<Config> primaryConfig = LoadPrimaryConfig();
@@ -138,7 +138,7 @@ user.Match(
 ```
 
 #### `T IfNoneThrow(Func<Exception> getException)`
-Throws an exception when the option is None. The exception is only created if needed.
+Returns the option value or throws an exception if None.
 
 ```csharp
 Option<DatabaseConnection> connection = EstablishConnection();
@@ -164,14 +164,14 @@ await filePath.IterTask(async path => await SaveConfigAsync(path));
 ```
 
 #### `T? IfNoneNull()`
-Converts the option to a nullable reference type. Returns the value if present, otherwise returns null.
+Converts the option to a nullable reference type.
 
 ```csharp
 Option<string> userName = GetUserName();
 string? nullableUserName = userName.IfNoneNull(); // Returns null if None, otherwise the string value
 
 #### `T? IfNoneNullable()`
-Converts the option to a nullable value type. Returns the value if present, otherwise returns null.
+Converts the option to a nullable value type.
 
 ```csharp
 Option<int> userId = GetUserId();
@@ -182,7 +182,7 @@ int? nullableUserId = userId.IfNoneNullable(); // Returns null if None, otherwis
 
 ### Result&lt;T&gt;
 
-Represents the result of an operation that can either succeed with a value or fail with an error. Eliminates exception-based error handling for expected failure scenarios.
+Represents the result of an operation that can either succeed with a value or fail with an error.
 
 ```csharp
 // Creating success results
@@ -352,7 +352,7 @@ int? nullableResult = calculationResult.IfErrorNullable(); // Returns null if er
 
 ### Either&lt;TLeft, TRight&gt;
 
-Represents a value that can be one of two types. Useful for representing alternatives where both possibilities are valid outcomes.
+Represents a value that can be one of two types, either left or right.
 
 ```csharp
 // Creating Left values
@@ -450,12 +450,28 @@ Either<TrialVersion, FullVersion> softwareVersion = CheckLicense();
 FullVersion licensed = softwareVersion.IfLeftThrow(new InvalidOperationException("Full license required"));
 ```
 
+#### `TLeft IfRightThrow(Exception exception)`
+Throws an exception when the either contains a right value.
+
+```csharp
+Either<BasicPlan, PremiumPlan> userPlan = Either.Left<BasicPlan, PremiumPlan>(basicFeatures);
+BasicPlan plan = userPlan.IfRightThrow(new InvalidOperationException("Expected basic plan but got premium"));
+```
+
 #### `void Iter(Action<TRight> action)`
 Executes an action if the either contains a right value.
 
 ```csharp
 Either<PreviewMode, PublishMode> mode = DeterminePublishingMode(document);
 mode.Iter(publish => ExecutePublishWorkflow(publish));
+```
+
+#### `ValueTask IterTask(Func<TRight, ValueTask> asyncAction)`
+Executes an async action if the either contains a right value.
+
+```csharp
+Either<CacheResult, DatabaseResult> dataSource = GetDataSource();
+await dataSource.IterTask(async dbResult => await ProcessDatabaseResultAsync(dbResult));
 ```
 
 ---
@@ -520,7 +536,7 @@ Exception originalException = fileError.ToException(); // The original FileNotFo
 
 ### Enumerable Extensions
 
-Extensions for working with `IEnumerable<T>` in a functional style.
+Provides extension methods for working with `IEnumerable<T>` in a functional style.
 
 #### `Option<T> Head<T>()`
 Returns the first element as an Option, or None if the sequence is empty.
@@ -693,7 +709,7 @@ var processedOrders = orders
 
 ### AsyncEnumerable Extensions
 
-Extensions for working with `IAsyncEnumerable<T>`.
+Provides extension methods for working with `IAsyncEnumerable<T>` in a functional style.
 
 #### `ValueTask<Option<T>> Head<T>(CancellationToken cancellationToken)`
 Returns the first element as an Option asynchronously.

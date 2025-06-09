@@ -8,6 +8,9 @@ using System.Threading.Tasks;
 
 namespace common;
 
+/// <summary>
+/// Provides extension methods for working with IEnumerable&lt;T&gt; in a functional style.
+/// </summary>
 public static class EnumerableExtensions
 {
     /// <summary>
@@ -40,7 +43,16 @@ public static class EnumerableExtensions
               .DefaultIfEmpty(Option.None)
               .First();
 
-    public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
+   /// <summary>
+   /// Applies a result-returning function to each element, collecting successes or aggregating errors.
+   /// </summary>
+   /// <typeparam name="T">The source element type.</typeparam>
+   /// <typeparam name="T2">The result element type.</typeparam>
+   /// <param name="source">The source enumerable.</param>
+   /// <param name="selector">Function that returns a result for each element.</param>
+   /// <param name="cancellationToken">Cancellation token.</param>
+   /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
+   public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
         var errors = new List<Error>();
@@ -54,6 +66,15 @@ public static class EnumerableExtensions
                 : Result.Success(results.ToImmutableArray());
     }
 
+    /// <summary>
+    /// Applies an option-returning function to each element, succeeding only if all elements succeed.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="selector">Function that returns an option for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Some with all results if all succeed, otherwise None.</returns>
     public static Option<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Option<T2>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
@@ -68,6 +89,14 @@ public static class EnumerableExtensions
                 : Option.Some(results.ToImmutableArray());
     }
 
+    /// <summary>
+    /// Executes an action on each element in parallel.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="action">The action to execute for each element.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
     public static void Iter<T>(this IEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
@@ -76,6 +105,15 @@ public static class EnumerableExtensions
         Parallel.ForEach(source, options, item => action(item));
     }
 
+    /// <summary>
+    /// Executes an async action on each element in parallel.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="action">The async action to execute for each element.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the async operation.</returns>
     public static async ValueTask IterTask<T>(this IEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
@@ -113,6 +151,9 @@ public static class EnumerableExtensions
     }
 }
 
+/// <summary>
+/// Provides extension methods for working with IAsyncEnumerable&lt;T&gt; in a functional style.
+/// </summary>
 public static class AsyncEnumerableExtensions
 {
     /// <summary>
@@ -145,7 +186,16 @@ public static class AsyncEnumerableExtensions
                     .DefaultIfEmpty(Option.None)
                     .FirstAsync(cancellationToken);
 
-    public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
+   /// <summary>
+   /// Applies an async result-returning function to each element, collecting successes or aggregating errors.
+   /// </summary>
+   /// <typeparam name="T">The source element type.</typeparam>
+   /// <typeparam name="T2">The result element type.</typeparam>
+   /// <param name="source">The source async enumerable.</param>
+   /// <param name="selector">Async function that returns a result for each element.</param>
+   /// <param name="cancellationToken">Cancellation token.</param>
+   /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
+   public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
         var errors = new List<Error>();
@@ -163,6 +213,15 @@ public static class AsyncEnumerableExtensions
                 : Result.Success(results.ToImmutableArray());
     }
 
+    /// <summary>
+    /// Applies an async option-returning function to each element, succeeding only if all elements succeed.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source async enumerable.</param>
+    /// <param name="selector">Async function that returns an option for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Some with all results if all succeed, otherwise None.</returns>
     public static async ValueTask<Option<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Option<T2>>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
@@ -181,6 +240,15 @@ public static class AsyncEnumerableExtensions
                 : Option.Some(results.ToImmutableArray());
     }
 
+    /// <summary>
+    /// Executes an async action on each element in parallel.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source async enumerable.</param>
+    /// <param name="action">The async action to execute for each element.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the async operation.</returns>
     public static async ValueTask IterTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
@@ -229,8 +297,19 @@ public static class AsyncEnumerableExtensions
     }
 }
 
+/// <summary>
+/// Provides extension methods for safe dictionary operations.
+/// </summary>
 public static class DictionaryExtensions
 {
+    /// <summary>
+    /// Safely retrieves a value from a dictionary, returning an option.
+    /// </summary>
+    /// <typeparam name="TKey">The key type.</typeparam>
+    /// <typeparam name="TValue">The value type.</typeparam>
+    /// <param name="dictionary">The dictionary to search.</param>
+    /// <param name="key">The key to find.</param>
+    /// <returns>Some(value) if the key exists, otherwise None.</returns>
     public static Option<TValue> Find<TKey, TValue>(this IDictionary<TKey, TValue> dictionary, TKey key) =>
         dictionary.TryGetValue(key, out var value)
             ? Option.Some(value)

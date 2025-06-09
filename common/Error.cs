@@ -16,14 +16,31 @@ public record Error
         this.messages = [.. messages];
     }
 
+    /// <summary>
+    /// Gets all error messages as an immutable set.
+    /// </summary>
     public ImmutableHashSet<string> Messages => messages;
 
+    /// <summary>
+    /// Creates an error from one or more messages.
+    /// </summary>
+    /// <param name="messages">The error messages.</param>
+    /// <returns>An error containing the specified messages.</returns>
     public static Error From(params string[] messages) =>
         new(messages);
 
+    /// <summary>
+    /// Creates an error from an exception.
+    /// </summary>
+    /// <param name="exception">The exception to wrap.</param>
+    /// <returns>An exceptional error containing the exception.</returns>
     public static Error From(Exception exception) =>
         new Exceptional(exception);
 
+    /// <summary>
+    /// Converts the error to an appropriate exception.
+    /// </summary>
+    /// <returns>An exception representing this error.</returns>
     public virtual Exception ToException() =>
         messages.ToArray() switch
         {
@@ -38,12 +55,24 @@ public record Error
             _ => string.Join("; ", messages)
         };
 
+    /// <summary>
+    /// Implicitly converts a string to an error.
+    /// </summary>
     public static implicit operator Error(string message) =>
         From(message);
 
+    /// <summary>
+    /// Implicitly converts an exception to an error.
+    /// </summary>
     public static implicit operator Error(Exception exception) =>
         From(exception);
 
+    /// <summary>
+    /// Combines two errors into a single error.
+    /// </summary>
+    /// <param name="left">The first error.</param>
+    /// <param name="right">The second error.</param>
+    /// <returns>An error containing messages from both errors.</returns>
     public static Error operator +(Error left, Error right) =>
         (left.messages, right.messages) switch
         {
@@ -67,6 +96,9 @@ public record Error
             _ => messages.Aggregate(0, (hash, message) => HashCode.Combine(hash, message.GetHashCode()))
         };
 
+    /// <summary>
+    /// Represents an error that wraps an exception.
+    /// </summary>
     public sealed record Exceptional : Error
     {
         internal Exceptional(Exception exception) : base([exception.Message])
@@ -74,8 +106,15 @@ public record Error
             Exception = exception;
         }
 
+        /// <summary>
+        /// Gets the wrapped exception.
+        /// </summary>
         public Exception Exception { get; }
 
+        /// <summary>
+        /// Returns the original wrapped exception.
+        /// </summary>
+        /// <returns>The original exception.</returns>
         public override Exception ToException() => Exception;
 
         public bool Equals(Error.Exceptional? other) =>
