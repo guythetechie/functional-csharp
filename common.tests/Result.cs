@@ -113,6 +113,39 @@ public class ResultTests
     }
 
     [Fact]
+    public async Task MapTask_with_error_returns_original_error()
+    {
+        var gen = from error in Generator.Error
+                  from mapResult in Gen.String
+                  select (error, mapResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (error, mapResult) = x;
+            var errorResult = Result.Error<int>(error);
+            var result = await errorResult.MapTask(_ => ValueTask.FromResult(mapResult));
+
+            result.Should().BeError().Which.Should().Be(error);
+        });
+    }
+
+    [Fact]
+    public async Task MapTask_with_success_applies_function()
+    {
+        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
+                  from mapResult in Gen.String
+                  select (successResult, mapResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (successResult, mapResult) = x;
+            var result = await successResult.MapTask(_ => ValueTask.FromResult(mapResult));
+
+            result.Should().BeSuccess().Which.Should().Be(mapResult);
+        });
+    }
+
+    [Fact]
     public void MapError_with_success_returns_success_value()
     {
         var gen = Gen.Int;
@@ -131,7 +164,7 @@ public class ResultTests
     {
         var gen = from errorResult in Generator.GenerateErrorResult<int>()
                   from newError in Generator.Error
-                    select (errorResult, newError);
+                  select (errorResult, newError);
 
         gen.Sample(x =>
         {
@@ -172,6 +205,41 @@ public class ResultTests
             var (successResult, bindResult) = x;
 
             var result = successResult.Bind(_ => bindResult);
+
+            result.Should().Be(bindResult);
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_with_error_returns_original_error()
+    {
+        var gen = from error in Generator.Error
+                  from bindResult in Generator.GenerateResult(Gen.String)
+                  select (error, bindResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (error, bindResult) = x;
+            var errorResult = Result.Error<int>(error);
+
+            var result = await errorResult.BindTask(_ => ValueTask.FromResult(bindResult));
+
+            result.Should().BeError().Which.Should().Be(error);
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_with_success_applies_function()
+    {
+        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
+                  from bindResult in Generator.GenerateResult(Gen.String)
+                  select (successResult, bindResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (successResult, bindResult) = x;
+
+            var result = await successResult.BindTask(_ => ValueTask.FromResult(bindResult));
 
             result.Should().Be(bindResult);
         });

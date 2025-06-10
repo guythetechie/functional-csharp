@@ -70,6 +70,20 @@ Option<decimal> tax = price.Map(p => decimal.Parse(p))
                            .Map(p => p * 0.08m); // Some(2.3992m)
 ```
 
+#### `ValueTask<Option<T2>> MapTask<T2>(Func<T, ValueTask<T2>> asyncMapper)`
+Asynchronously transforms the option value using a function that returns a ValueTask.
+
+```csharp
+Option<string> filePath = Option.Some("config.json");
+Option<string> fileContent = await filePath.MapTask(async path =>
+    await File.ReadAllTextAsync(path));
+
+// Chain async transformations
+Option<User> user = Option.Some("user123");
+Option<UserProfile> profile = await user.MapTask(async userId =>
+    await LoadUserProfileAsync(userId));
+```
+
 #### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
 Chains option operations together (monadic bind).
 
@@ -82,6 +96,21 @@ static Option<User> FindUserById(string id) =>
     id == "123"
         ? Option.Some(new User("John"))
         : Option.None;
+```
+
+#### `ValueTask<Option<T2>> BindTask<T2>(Func<T, ValueTask<Option<T2>>> asyncBinder)`
+Asynchronously chains option operations together (monadic bind with async function).
+
+```csharp
+Option<string> userId = Option.Some("123");
+Option<User> user = await userId.BindTask(async id => await FindUserByIdAsync(id));
+Option<string> userEmail = await user.BindTask(async u => await GetUserEmailAsync(u.Id));
+
+static async ValueTask<Option<User>> FindUserByIdAsync(string id)
+{
+    var user = await DatabaseContext.Users.FindAsync(id);
+    return user != null ? Option.Some(user) : Option.None;
+}
 ```
 
 #### `Option<T> Where(Func<T, bool> predicate)`
@@ -233,6 +262,20 @@ Result<string> invalidInput = Result.Error<string>(Error.From("Invalid format"))
 Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input)); // Error("Invalid format")
 ```
 
+#### `ValueTask<Result<T2>> MapTask<T2>(Func<T, ValueTask<T2>> asyncMapper)`
+Asynchronously transforms the success value using a function that returns a ValueTask.
+
+```csharp
+Result<string> configPath = Result.Success("appsettings.json");
+Result<Configuration> config = await configPath.MapTask(async path =>
+    await LoadConfigurationAsync(path));
+
+// Errors are preserved through async transformations
+Result<string> invalidPath = Result.Error<string>(Error.From("File not found"));
+Result<Configuration> errorResult = await invalidPath.MapTask(async path =>
+    await LoadConfigurationAsync(path)); // Error("File not found")
+```
+
 #### `Result<T> MapError(Func<Error, Error> mapper)`
 Transforms the error if the result is in error; otherwise preserves the success value.
 
@@ -246,7 +289,6 @@ Result<ConfigFile> configResult = LoadConfig("settings.json");
 Result<ConfigFile> contextualError = configResult.MapError(error =>
     error + Error.From($"Failed to load configuration from settings.json"));
 ```
-
 #### `Result<T2> Bind<T2>(Func<T, Result<T2>> binder)`
 Chains result operations together (monadic bind).
 
@@ -256,6 +298,22 @@ Result<Payment> paymentResult =
     Result.Success(orderRequest)
           .Bind(req => PaymentGateway.Validate(req))
           .Bind(valid => PaymentGateway.Charge(valid));
+```
+
+#### `ValueTask<Result<T2>> BindTask<T2>(Func<T, ValueTask<Result<T2>>> asyncBinder)`
+Asynchronously chains result operations together (monadic bind with async function).
+
+```csharp
+// Chain async validation and processing steps
+Result<Order> orderResult = Result.Success(orderRequest);
+Result<PaymentResult> paymentResult = await orderResult
+    .BindTask(async req => await PaymentGateway.ValidateAsync(req))
+    .BindTask(async valid => await PaymentGateway.ChargeAsync(valid));
+
+// Async database operations with error handling
+Result<User> userResult = await Result.Success(userId)
+    .BindTask(async id => await FindUserInDatabaseAsync(id))
+    .BindTask(async user => await UpdateUserLastLoginAsync(user));
 ```
 
 #### LINQ Support

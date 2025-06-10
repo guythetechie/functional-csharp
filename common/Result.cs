@@ -136,6 +136,18 @@ public static class Result
                      error => Error<T2>(error));
 
     /// <summary>
+    /// Asynchronously transforms the success value using a function that returns a ValueTask.
+    /// </summary>
+    /// <typeparam name="T">The source value type.</typeparam>
+    /// <typeparam name="T2">The result value type.</typeparam>
+    /// <param name="result">The result to transform.</param>
+    /// <param name="f">The async transformation function.</param>
+    /// <returns>Success(await f(value)) if successful, otherwise the original error.</returns>
+    public static async ValueTask<Result<T2>> MapTask<T, T2>(this Result<T> result, Func<T, ValueTask<T2>> f) =>
+        await result.Match(async value => Success(await f(value)),
+                           async error => await ValueTask.FromResult(Error<T2>(error)));
+
+    /// <summary>
     /// Transforms the error, preserving any success value.
     /// </summary>
     /// <typeparam name="T">The value type.</typeparam>
@@ -157,6 +169,18 @@ public static class Result
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
         result.Match(value => f(value),
                      error => Error<T2>(error));
+
+    /// <summary>
+    /// Asynchronously chains result operations together (monadic bind with async function).
+    /// </summary>
+    /// <typeparam name="T">The source value type.</typeparam>
+    /// <typeparam name="T2">The result value type.</typeparam>
+    /// <param name="result">The result to bind.</param>
+    /// <param name="f">The async function that returns a result.</param>
+    /// <returns>await f(value) if successful, otherwise the original error.</returns>
+    public static async ValueTask<Result<T2>> BindTask<T, T2>(this Result<T> result, Func<T, ValueTask<Result<T2>>> f) =>
+        await result.Match(async value => await f(value),
+                           async error => await ValueTask.FromResult(Error<T2>(error)));
 
     /// <summary>
     /// Projects the result value (LINQ support).

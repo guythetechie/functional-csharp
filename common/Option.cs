@@ -153,6 +153,18 @@ public static class Option
                      () => None);
 
     /// <summary>
+    /// Asynchronously transforms the option value using a function that returns a ValueTask.
+    /// </summary>
+    /// <typeparam name="T">The source value type.</typeparam>
+    /// <typeparam name="T2">The result value type.</typeparam>
+    /// <param name="option">The option to transform.</param>
+    /// <param name="f">The async transformation function.</param>
+    /// <returns>Some(await f(value)) if Some, otherwise None.</returns>
+    public static async ValueTask<Option<T2>> MapTask<T, T2>(this Option<T> option, Func<T, ValueTask<T2>> f) =>
+        await option.Match(async t => Some(await f(t)),
+                           async () => await ValueTask.FromResult(Option<T2>.None()));
+
+    /// <summary>
     /// Chains option operations together (monadic bind).
     /// </summary>
     /// <typeparam name="T">The source value type.</typeparam>
@@ -163,6 +175,18 @@ public static class Option
     public static Option<T2> Bind<T, T2>(this Option<T> option, Func<T, Option<T2>> f) =>
         option.Match(t => f(t),
                      () => None);
+
+    /// <summary>
+    /// Asynchronously chains option operations together (monadic bind with async function).
+    /// </summary>
+    /// <typeparam name="T">The source value type.</typeparam>
+    /// <typeparam name="T2">The result value type.</typeparam>
+    /// <param name="option">The option to bind.</param>
+    /// <param name="f">The async function that returns an option.</param>
+    /// <returns>await f(value) if Some, otherwise None.</returns>
+    public static async ValueTask<Option<T2>> BindTask<T, T2>(this Option<T> option, Func<T, ValueTask<Option<T2>>> f) =>
+        await option.Match(async t => await f(t),
+                           async () => await ValueTask.FromResult(Option<T2>.None()));
 
     /// <summary>
     /// Projects the option value (LINQ support).

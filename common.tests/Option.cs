@@ -95,6 +95,33 @@ public class OptionTests
     }
 
     [Fact]
+    public async Task MapTask_with_some_applies_function()
+    {
+        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
+                  from mapResult in Gen.Int
+                  select (option, mapResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (option, mapResult) = x;
+
+            var result = await option.MapTask(_ => ValueTask.FromResult(mapResult));
+
+            result.Should().BeSome().Which.Should().Be(mapResult);
+        });
+    }
+
+    [Fact]
+    public async Task MapTask_with_none_returns_none()
+    {
+        Option<int> option = Option.None;
+
+        var result = await option.MapTask(x => ValueTask.FromResult(x * 2));
+
+        result.Should().BeNone();
+    }
+
+    [Fact]
     public void Bind_with_some_applies_function()
     {
         var gen = from option in Generator.GenerateSomeOption(Gen.Int)
@@ -111,7 +138,7 @@ public class OptionTests
     }
 
     [Fact]
-    public void Bind_with_none_returns_the_original_option()
+    public void Bind_with_none_returns_none()
     {
         var gen = Generator.GenerateOption(Gen.Int);
 
@@ -119,7 +146,36 @@ public class OptionTests
         {
             Option<int> option = Option.None;
             var result = option.Bind(x => bindResult);
-            result.Should().Be(option);
+            result.Should().BeNone();
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_with_some_applies_function()
+    {
+        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
+                  from bindResult in Generator.GenerateOption(Gen.String)
+                  select (option, bindResult);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (option, bindResult) = x;
+            var result = await option.BindTask(_ => ValueTask.FromResult(bindResult));
+
+            result.Should().Be(bindResult);
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_with_none_returns_none()
+    {
+        var gen = Generator.GenerateOption(Gen.Int);
+
+        await gen.SampleAsync(async bindResult =>
+        {
+            Option<int> option = Option.None;
+            var result = await option.BindTask(x => ValueTask.FromResult(bindResult));
+            result.Should().BeNone();
         });
     }
 
