@@ -42,6 +42,42 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void SingleOrNone_with_empty_enumerable_returns_none()
+    {
+        var emptyEnumerable = Enumerable.Empty<int>();
+
+        var result = emptyEnumerable.SingleOrNone();
+
+        result.Should().BeNone();
+    }
+
+    [Fact]
+    public void SingleOrNone_with_one_element_returns_some_with_that_element()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            var result = new[] { value }.SingleOrNone();
+            result.Should().BeSome().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void SingleOrNone_with_multiple_elements_returns_none()
+    {
+        var gen = from array in Gen.Int.Array
+                  where array.Length > 1
+                  select array;
+
+        gen.Sample(array =>
+        {
+            var result = array.SingleOrNone();
+            result.Should().BeNone();
+        });
+    }
+
+    [Fact]
     public void Choose_with_all_somes_has_same_count_as_original()
     {
         var gen = Gen.Int.Array;

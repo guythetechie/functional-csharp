@@ -613,6 +613,30 @@ int[] numbers = { };
 Option<int> firstNumber = numbers.Head(); // None (instead of throwing an exception)
 ```
 
+#### `Option<T> SingleOrNone<T>()`
+Returns the single element of the sequence as an option.
+
+```csharp
+// Safe alternative to .Single()
+List<User> admins = GetAdminUsers();
+Option<User> singleAdmin = admins.SingleOrNone();
+
+singleAdmin.Match(
+    admin => Console.WriteLine($"Admin user: {admin.Name}"),
+    () => Console.WriteLine("Expected exactly one admin, but found zero or multiple")
+);
+
+// Works with any collection size
+int[] oneElement = { 42 };
+Option<int> single = oneElement.SingleOrNone(); // Some(42)
+
+int[] empty = { };
+Option<int> none = empty.SingleOrNone(); // None
+
+int[] multiple = { 1, 2, 3 };
+Option<int> alsoNone = multiple.SingleOrNone(); // None (multiple elements)
+```
+
 #### `IEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
 Filters and transforms elements using an option-returning selector.
 
@@ -623,6 +647,29 @@ var validNumbers = inputs.Choose(input =>
     int.TryParse(input, out var number) ? Option.Some(number) : Option.None);
 
 validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Output: 42, 100, 7
+```
+
+#### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, ValueTask<Option<T2>>> selector)`
+Filters and transforms elements using an async option-returning selector.
+
+```csharp
+// Process files asynchronously, keeping only successful operations
+string[] filePaths = { "file1.txt", "file2.txt", "file3.txt" };
+IAsyncEnumerable<string> fileContents = filePaths.Choose(async path =>
+{
+    try
+    {
+        string content = await File.ReadAllTextAsync(path);
+        return Option.Some(content);
+    }
+    catch
+    {
+        return Option.None; // Skip files that can't be read
+    }
+});
+
+await fileContents.IterTask(async content =>
+    await ProcessFileContentAsync(content), Option.None, CancellationToken.None);
 ```
 
 #### `Option<T2> Pick<T, T2>(Func<T, Option<T2>> selector)`
@@ -800,6 +847,30 @@ await validEntries.IterTask(async entry => {
         await NotifyAdmins(entry);
     }
 }, Option.None, CancellationToken.None); // Only valid log entries are processed, invalid lines are skipped
+```
+
+#### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, ValueTask<Option<T2>>> selector)`
+Filters and transforms async elements using an async option-returning selector.
+
+```csharp
+// Process streaming data with async validation
+IAsyncEnumerable<string> dataStream = GetDataStreamAsync();
+IAsyncEnumerable<ProcessedData> validData = dataStream.Choose(async item =>
+{
+    try
+    {
+        var validated = await ValidateDataAsync(item);
+        var processed = await ProcessDataAsync(validated);
+        return Option.Some(processed);
+    }
+    catch
+    {
+        return Option.None; // Skip invalid or unprocessable items
+    }
+});
+
+await validData.IterTask(async data =>
+    await SaveToDatabase(data), Option.None, CancellationToken.None);
 ```
 
 #### `ValueTask<Option<T2>> Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`

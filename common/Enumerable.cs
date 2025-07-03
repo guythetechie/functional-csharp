@@ -29,6 +29,16 @@ public static class EnumerableExtensions
     }
 
     /// <summary>
+    /// Returns the single element of the sequence as an option.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source sequence.</param>
+    /// <returns>Some(element) if the sequence contains exactly one element, otherwise None.</returns>
+    public static Option<T> SingleOrNone<T>(this IEnumerable<T> source) =>
+        source.Select(Option.Some)
+              .SingleOrDefault() ?? Option.None;
+
+    /// <summary>
     /// Filters and transforms elements using an option-returning selector.
     /// </summary>
     /// <typeparam name="T">The source element type.</typeparam>
@@ -40,6 +50,18 @@ public static class EnumerableExtensions
         source.Select(selector)
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
+
+    /// <summary>
+    /// Filters and transforms elements using an async option-returning selector.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source sequence.</param>
+    /// <param name="selector">Async function that returns an option for each element.</param>
+    /// <returns>An async sequence containing only the values where the selector returned Some.</returns>
+    public static IAsyncEnumerable<T2> Choose<T, T2>(this IEnumerable<T> source, Func<T, ValueTask<Option<T2>>> selector) =>
+        source.ToAsyncEnumerable()
+              .Choose(selector);
 
     /// <summary>
     /// Finds the first element that produces a Some value when transformed.
@@ -201,6 +223,19 @@ public static class AsyncEnumerableExtensions
     /// <returns>An async sequence containing only the values where the selector returned Some.</returns>
     public static IAsyncEnumerable<T2> Choose<T, T2>(this IAsyncEnumerable<T> source, Func<T, Option<T2>> selector) =>
         source.Select(selector)
+              .Where(option => option.IsSome)
+              .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
+
+    /// <summary>
+    /// Filters and transforms async elements using an option-returning selector.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source async sequence.</param>
+    /// <param name="selector">Function that returns an option for each element.</param>
+    /// <returns>An async sequence containing only the values where the selector returned Some.</returns>
+    public static IAsyncEnumerable<T2> Choose<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Option<T2>>> selector) =>
+        source.Select(async (T item, CancellationToken _) => await selector(item))
               .Where(option => option.IsSome)
               .Select(option => option.IfNone(() => throw new UnreachableException("All options should be in the 'Some' state.")));
 
