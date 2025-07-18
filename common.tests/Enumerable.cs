@@ -225,18 +225,13 @@ public class EnumerableExtensionsTests
     [Fact]
     public void Iter_calls_action_for_each_element()
     {
-        var gen = from array in Gen.Int.Array
-                  let maxDegreesOfParallelismGen = Gen.OneOf(Gen.Const(-1), Gen.Int[1, array.Length + 1])
-                  from maxDegreesOfParallelism in Generator.GenerateOption(maxDegreesOfParallelismGen)
-                  select (array, maxDegreesOfParallelism);
+        var gen = Gen.Int.Array;
 
-        gen.Sample(x =>
+        gen.Sample(array =>
         {
-            var (array, maxDegreesOfParallelism) = x;
             var addedItems = ImmutableArray.Create<int>();
 
             array.Iter(x => ImmutableInterlocked.Update(ref addedItems, items => items.Add(x)),
-                       maxDegreesOfParallelism,
                        TestContext.Current.CancellationToken);
 
             addedItems.Should().BeEquivalentTo(array);
@@ -264,7 +259,7 @@ public class EnumerableExtensionsTests
                 {
                     cancellationTokenSource.Cancel();
                 }
-            }, maxDegreeOfParallelism: 1, cancellationTokenSource.Token);
+            }, cancellationTokenSource.Token);
 
             action.Should().Throw<OperationCanceledException>();
             callCount.Should().BeGreaterThanOrEqualTo(cancelAfter);
@@ -272,7 +267,27 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
-    public void Iter_with_max_degree_of_parallelism_limits_parallelism()
+    public void IterParallel_calls_action_for_each_element()
+    {
+        var gen = from array in Gen.Int.Array
+                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  select (array, maxDegreesOfParallelism);
+
+        gen.Sample(x =>
+        {
+            var (array, maxDegreesOfParallelism) = x;
+            var addedItems = ImmutableArray.Create<int>();
+
+            array.IterParallel(x => ImmutableInterlocked.Update(ref addedItems, items => items.Add(x)),
+                               maxDegreesOfParallelism,
+                               TestContext.Current.CancellationToken);
+
+            addedItems.Should().BeEquivalentTo(array);
+        });
+    }
+
+    [Fact]
+    public void IterParallel_with_max_degree_of_parallelism_limits_parallelism()
     {
         var gen = from array in Gen.Int.Array
                   from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1]
@@ -286,7 +301,7 @@ public class EnumerableExtensionsTests
 #pragma warning disable CA1031 // Do not catch general exception types
             try
             {
-                array.Iter(_ =>
+                array.IterParallel(_ =>
                 {
                     iterations++;
                     throw new InvalidOperationException();
@@ -305,21 +320,17 @@ public class EnumerableExtensionsTests
     [Fact]
     public async Task IterTask_calls_action_for_each_element()
     {
-        var gen = from array in Gen.Int.Array
-                  let maxDegreesOfParallelismGen = Gen.OneOf(Gen.Const(-1), Gen.Int[1, array.Length + 1])
-                  from maxDegreesOfParallelism in Generator.GenerateOption(maxDegreesOfParallelismGen)
-                  select (array, maxDegreesOfParallelism);
+        var gen = Gen.Int.Array;
 
-        await gen.SampleAsync(async x =>
+        await gen.SampleAsync(async array =>
         {
-            var (array, maxDegreesOfParallelism) = x;
             var addedItems = ImmutableArray.Create<int>();
 
             await array.IterTask(async x =>
             {
                 ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
                 await ValueTask.CompletedTask;
-            }, maxDegreeOfParallelism: Option.None, TestContext.Current.CancellationToken);
+            }, TestContext.Current.CancellationToken);
 
             addedItems.Should().BeEquivalentTo(array);
         });
@@ -346,7 +357,7 @@ public class EnumerableExtensionsTests
                 {
                     await cancellationTokenSource.CancelAsync();
                 }
-            }, maxDegreeOfParallelism: 1, cancellationTokenSource.Token);
+            }, cancellationTokenSource.Token);
 
             await f.Should().ThrowAsync<OperationCanceledException>();
             callCount.Should().BeGreaterThanOrEqualTo(cancelAfter);
@@ -354,7 +365,29 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task IterTask_with_max_degree_of_parallelism_limits_parallelism()
+    public async Task IterTaskParallel_calls_action_for_each_element()
+    {
+        var gen = from array in Gen.Int.Array
+                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  select (array, maxDegreesOfParallelism);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (array, maxDegreesOfParallelism) = x;
+            var addedItems = ImmutableArray.Create<int>();
+
+            await array.IterTaskParallel(async x =>
+            {
+                ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
+                await ValueTask.CompletedTask;
+            }, maxDegreesOfParallelism, TestContext.Current.CancellationToken);
+
+            addedItems.Should().BeEquivalentTo(array);
+        });
+    }
+
+    [Fact]
+    public async Task IterTaskParallel_with_max_degree_of_parallelism_limits_parallelism()
     {
         var gen = from array in Gen.Int.Array
                   from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1]
@@ -368,7 +401,7 @@ public class EnumerableExtensionsTests
 #pragma warning disable CA1031 // Do not catch general exception types
             try
             {
-                await array.IterTask(async _ =>
+                await array.IterTaskParallel(async _ =>
                 {
                     iterations++;
                     await ValueTask.CompletedTask;
@@ -652,28 +685,23 @@ public class AsyncEnumerableExtensionsTests
 
             result.Should().BeNone();
         });
-    }
-
-    [Fact]
+    }    [Fact]
     public async Task IterTask_calls_action_for_each_element()
     {
-        var gen = from array in Gen.Int.Array
-                  let maxDegreesOfParallelismGen = Gen.OneOf(Gen.Const(-1), Gen.Int[1, array.Length + 1])
-                  from maxDegreesOfParallelism in Generator.GenerateOption(maxDegreesOfParallelismGen)
-                  select (array.ToAsyncEnumerable(), maxDegreesOfParallelism);
+        var gen = Gen.Int.Array;
 
-        await gen.SampleAsync(async x =>
+        await gen.SampleAsync(async array =>
         {
-            var (array, maxDegreesOfParallelism) = x;
+            var asyncEnumerable = array.ToAsyncEnumerable();
             var addedItems = ImmutableArray.Create<int>();
 
-            await array.IterTask(async x =>
+            await asyncEnumerable.IterTask(async x =>
             {
                 ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
                 await ValueTask.CompletedTask;
-            }, maxDegreeOfParallelism: Option.None, TestContext.Current.CancellationToken);
+            }, TestContext.Current.CancellationToken);
 
-            var expected = await array.ToArrayAsync(TestContext.Current.CancellationToken);
+            var expected = await asyncEnumerable.ToArrayAsync(TestContext.Current.CancellationToken);
             addedItems.Should().BeEquivalentTo(expected);
         });
     }
@@ -699,7 +727,7 @@ public class AsyncEnumerableExtensionsTests
                 {
                     await cancellationTokenSource.CancelAsync();
                 }
-            }, maxDegreeOfParallelism: 1, cancellationTokenSource.Token);
+            }, cancellationTokenSource.Token);
 
             await f.Should().ThrowAsync<OperationCanceledException>();
             callCount.Should().BeGreaterThanOrEqualTo(cancelAfter);
@@ -707,7 +735,30 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task IterTask_with_max_degree_of_parallelism_limits_parallelism()
+    public async Task IterTaskParallel_calls_action_for_each_element()
+    {
+        var gen = from array in Gen.Int.Array
+                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  select (array.ToAsyncEnumerable(), maxDegreesOfParallelism);
+
+        await gen.SampleAsync(async x =>
+        {
+            var (array, maxDegreesOfParallelism) = x;
+            var addedItems = ImmutableArray.Create<int>();
+
+            await array.IterTaskParallel(async x =>
+            {
+                ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
+                await ValueTask.CompletedTask;
+            }, maxDegreesOfParallelism, TestContext.Current.CancellationToken);
+
+            var expected = await array.ToArrayAsync(TestContext.Current.CancellationToken);
+            addedItems.Should().BeEquivalentTo(expected);
+        });
+    }
+
+    [Fact]
+    public async Task IterTaskParallel_with_max_degree_of_parallelism_limits_parallelism()
     {
         var gen = from array in Gen.Int.Array
                   from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1]
@@ -721,7 +772,7 @@ public class AsyncEnumerableExtensionsTests
 #pragma warning disable CA1031 // Do not catch general exception types
             try
             {
-                await array.IterTask(async _ =>
+                await array.IterTaskParallel(async _ =>
                 {
                     iterations++;
                     await ValueTask.CompletedTask;

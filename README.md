@@ -668,7 +668,7 @@ IAsyncEnumerable<string> fileContents = filePaths.Choose(async path =>
 });
 
 await fileContents.IterTask(async content =>
-    await ProcessFileContentAsync(content), Option.None, CancellationToken.None);
+    await ProcessFileContentAsync(content));
 ```
 
 #### `Option<T2> Pick<T, T2>(Func<T, Option<T2>> selector)`
@@ -753,39 +753,73 @@ var (labels, values) = dataPoints.Unzip();
 // labels: ["A", "B", "C"], values: [1.5, 2.0, 3.5]
 ```
 
-#### `void Iter<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `void Iter<T>(Action<T> action, CancellationToken cancellationToken = default)`
+Executes an action on each element sequentially.
+
+```csharp
+List<ImageFile> images = GetImagesToProcess();
+
+// Process sequentially
+images.Iter(image => ProcessImage(image));
+
+// Process with cancellation support
+images.Iter(
+    image => ProcessImage(image),
+    cancellationToken: GetCancellationToken()
+);
+```
+
+#### `void IterParallel<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
 Executes an action on each element in parallel.
 
 ```csharp
 List<ImageFile> images = GetImagesToProcess();
-CancellationToken cancellationToken = GetCancellationToken();
 
-// Process with default parallelism
-images.Iter(
+// Process with unlimited parallelism
+images.IterParallel(
     image => ProcessImage(image),
-    maxDegreeOfParallelism: Option.None,
-    cancellationToken
+    maxDegreeOfParallelism: Option.None
 );
 
 // Process with limited parallelism
-images.Iter(
+images.IterParallel(
     image => ProcessImage(image),
-    maxDegreeOfParallelism: 4, // Max 4 parallel operations, uses implicit conversion of int -> Option<int>
-    cancellationToken
+    maxDegreeOfParallelism: 4 // Max 4 parallel operations, uses implicit conversion of int -> Option<int>
 );
 ```
 
-#### `ValueTask IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `ValueTask IterTask<T>(Func<T, ValueTask> action, CancellationToken cancellationToken = default)`
+Executes an async action on each element sequentially.
+
+```csharp
+List<EmailAddress> recipients = GetEmailRecipients();
+
+// Process sequentially
+await recipients.IterTask(async email => await SendEmailAsync(email));
+
+// Process with cancellation support
+await recipients.IterTask(
+    async email => await SendEmailAsync(email),
+    cancellationToken: GetCancellationToken()
+);
+```
+
+#### `ValueTask IterTaskParallel<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
 Executes an async action on each element in parallel.
 
 ```csharp
 List<EmailAddress> recipients = GetEmailRecipients();
-CancellationToken cancellationToken = GetCancellationToken();
 
-await recipients.IterTask(
+// Process with unlimited parallelism
+await recipients.IterTaskParallel(
     async email => await SendEmailAsync(email),
-    maxDegreeOfParallelism: 10, // Max 10 concurrent email sends, uses implicit conversion of int -> Option<int>
-    cancellationToken
+    maxDegreeOfParallelism: Option.None
+);
+
+// Process with limited parallelism
+await recipients.IterTaskParallel(
+    async email => await SendEmailAsync(email),
+    maxDegreeOfParallelism: 10 // Max 10 concurrent email sends, uses implicit conversion of int -> Option<int>
 );
 ```
 
@@ -845,7 +879,7 @@ await validEntries.IterTask(async entry => {
     {
         await NotifyAdmins(entry);
     }
-}, Option.None, CancellationToken.None); // Only valid log entries are processed, invalid lines are skipped
+}); // Only valid log entries are processed, invalid lines are skipped
 ```
 
 #### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, ValueTask<Option<T2>>> selector)`
@@ -869,7 +903,7 @@ IAsyncEnumerable<ProcessedData> validData = dataStream.Choose(async item =>
 });
 
 await validData.IterTask(async data =>
-    await SaveToDatabase(data), Option.None, CancellationToken.None);
+    await SaveToDatabase(data));
 ```
 
 #### `ValueTask<Option<T2>> Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
@@ -942,16 +976,38 @@ var (labels, values) = await dataStream.Unzip(cancellationToken);
 // labels: ImmutableArray<string>, values: ImmutableArray<double>
 ```
 
-#### `ValueTask IterTask<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)`
+#### `ValueTask IterTask<T>(Func<T, ValueTask> action, CancellationToken cancellationToken = default)`
+Executes an async action on each element sequentially.
+
+```csharp
+IAsyncEnumerable<DatabaseRecord> records = GetRecordsAsync();
+
+// Process sequentially
+await records.IterTask(async record => await ProcessRecordAsync(record));
+
+// Process with cancellation support
+await records.IterTask(
+    async record => await ProcessRecordAsync(record),
+    cancellationToken: GetCancellationToken()
+);
+```
+
+#### `ValueTask IterTaskParallel<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
 Executes an async action on each element in parallel.
 
 ```csharp
 IAsyncEnumerable<DatabaseRecord> records = GetRecordsAsync();
 
-await records.IterTask(
+// Process with unlimited parallelism
+await records.IterTaskParallel(
     async record => await ProcessRecordAsync(record),
-    maxDegreeOfParallelism: 5, // Process 5 records concurrently, uses implicit conversion of int -> Option<int>
-    cancellationToken
+    maxDegreeOfParallelism: Option.None
+);
+
+// Process with limited parallelism
+await records.IterTaskParallel(
+    async record => await ProcessRecordAsync(record),
+    maxDegreeOfParallelism: 5 // Process 5 records concurrently, uses implicit conversion of int -> Option<int>
 );
 ```
 
@@ -995,6 +1051,8 @@ await foreach (var order in processedOrders)
 
 ### Dictionary Extensions
 
+Provides extension methods for safe dictionary operations.
+
 #### `Option<TValue> Find<TKey, TValue>(TKey key)`
 Safely retrieves a value from a dictionary.
 
@@ -1007,8 +1065,6 @@ int timeout = config.Find("RequestTimeoutSeconds")
                                     : Option.None)
                     .IfNone(() => 30);
 ```
----
-
 ---
 
 ### Unit

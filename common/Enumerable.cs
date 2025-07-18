@@ -19,14 +19,10 @@ public static class EnumerableExtensions
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source sequence.</param>
     /// <returns>Some(first element) if the sequence has elements, otherwise None.</returns>
-    public static Option<T> Head<T>(this IEnumerable<T> source)
-    {
-        using var enumerator = source.GetEnumerator();
-
-        return enumerator.MoveNext()
-                ? Option.Some(enumerator.Current)
-                : Option.None;
-    }
+    public static Option<T> Head<T>(this IEnumerable<T> source) =>
+        source.Select(Option.Some)
+              .DefaultIfEmpty(Option.None)
+              .First();
 
     /// <summary>
     /// Returns the single element of the sequence as an option.
@@ -34,9 +30,21 @@ public static class EnumerableExtensions
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source sequence.</param>
     /// <returns>Some(element) if the sequence contains exactly one element, otherwise None.</returns>
-    public static Option<T> SingleOrNone<T>(this IEnumerable<T> source) =>
-        source.Select(Option.Some)
-              .SingleOrDefault() ?? Option.None;
+    public static Option<T> SingleOrNone<T>(this IEnumerable<T> source)
+    {
+        using var enumerator = source.GetEnumerator();
+
+        if (enumerator.MoveNext() is false)
+        {
+            return Option.None; // No elements
+        }
+
+        var item = Option.Some(enumerator.Current);
+
+        return enumerator.MoveNext()
+                ? Option.None // More than one element
+                : item; // Exactly one element
+    }
 
     /// <summary>
     /// Filters and transforms elements using an option-returning selector.
@@ -77,22 +85,21 @@ public static class EnumerableExtensions
               .DefaultIfEmpty(Option.None)
               .First();
 
-   /// <summary>
-   /// Applies a result-returning function to each element, collecting successes or aggregating errors.
-   /// </summary>
-   /// <typeparam name="T">The source element type.</typeparam>
-   /// <typeparam name="T2">The result element type.</typeparam>
-   /// <param name="source">The source enumerable.</param>
-   /// <param name="selector">Function that returns a result for each element.</param>
-   /// <param name="cancellationToken">Cancellation token.</param>
-   /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
-   public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies a result-returning function to each element, collecting successes or aggregating errors.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="selector">Function that returns a result for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
+    public static Result<ImmutableArray<T2>> Traverse<T, T2>(this IEnumerable<T> source, Func<T, Result<T2>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
         var errors = new List<Error>();
 
         source.Iter(item => selector(item).Match(results.Add, errors.Add),
-                    maxDegreeOfParallelism: 1,
                     cancellationToken);
 
         return errors.Count > 0
@@ -115,7 +122,6 @@ public static class EnumerableExtensions
         var hasNone = false;
 
         source.Iter(item => selector(item).Match(results.Add, () => hasNone = true),
-                    maxDegreeOfParallelism: 1,
                     cancellationToken);
 
         return hasNone
@@ -124,14 +130,35 @@ public static class EnumerableExtensions
     }
 
     /// <summary>
+    /// Executes an action on each element sequentially.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="action">The action to execute for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    public static void Iter<T>(this IEnumerable<T> source, Action<T> action, CancellationToken cancellationToken = default) =>
+        source.IterParallel(action, maxDegreeOfParallelism: 1, cancellationToken);
+
+    /// <summary>
+    /// Executes an async action on each element sequentially.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source enumerable.</param>
+    /// <param name="action">The async action to execute for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the async operation.</returns>
+    public static ValueTask IterTask<T>(this IEnumerable<T> source, Func<T, ValueTask> action, CancellationToken cancellationToken = default) =>
+        source.IterTaskParallel(action, maxDegreeOfParallelism: 1, cancellationToken);
+
+    /// <summary>
     /// Executes an action on each element in parallel.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source enumerable.</param>
     /// <param name="action">The action to execute for each element.</param>
-    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism. Set to <see cref="Option.None"/> for unbounded parallelism.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
-    public static void Iter<T>(this IEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
+    public static void IterParallel<T>(this IEnumerable<T> source, Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
         maxDegreeOfParallelism.Iter(max => options.MaxDegreeOfParallelism = max);
@@ -145,10 +172,10 @@ public static class EnumerableExtensions
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source enumerable.</param>
     /// <param name="action">The async action to execute for each element.</param>
-    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism. Set to <see cref="Option.None"/> for unbounded parallelism.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the async operation.</returns>
-    public static async ValueTask IterTask<T>(this IEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
+    public static async ValueTask IterTaskParallel<T>(this IEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
         maxDegreeOfParallelism.Iter(max => options.MaxDegreeOfParallelism = max);
@@ -171,12 +198,12 @@ public static class EnumerableExtensions
         });
 
     /// <summary>
-    /// Separates an enumerable of tuples into a tuple of immutable arrays.
+    /// Separates an enumerable of tuples into a tuple of arrays.
     /// </summary>
     /// <typeparam name="T1">The first tuple element type.</typeparam>
     /// <typeparam name="T2">The second tuple element type.</typeparam>
     /// <param name="source">The source enumerable of tuples.</param>
-    /// <returns>A tuple containing two immutable arrays with the separated elements.</returns>
+    /// <returns>A tuple containing two arrays with the separated elements.</returns>
     public static (ImmutableArray<T1>, ImmutableArray<T2>) Unzip<T1, T2>(this IEnumerable<(T1, T2)> source)
     {
         var list1 = new List<T1>();
@@ -204,14 +231,10 @@ public static class AsyncEnumerableExtensions
     /// <param name="source">The source async sequence.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>Some(first element) if the sequence has elements, otherwise None.</returns>
-    public static async ValueTask<Option<T>> Head<T>(this IAsyncEnumerable<T> source, CancellationToken cancellationToken)
-    {
-        await using var enumerator = source.GetAsyncEnumerator(cancellationToken);
-
-        return await enumerator.MoveNextAsync()
-                ? Option.Some(enumerator.Current)
-                : Option.None;
-    }
+    public static async ValueTask<Option<T>> Head<T>(this IAsyncEnumerable<T> source, CancellationToken cancellationToken) =>
+        await source.Select(Option.Some)
+                    .DefaultIfEmpty(Option.None)
+                    .FirstAsync(cancellationToken);
 
     /// <summary>
     /// Filters and transforms async elements using an option-returning selector.
@@ -254,27 +277,25 @@ public static class AsyncEnumerableExtensions
                     .DefaultIfEmpty(Option.None)
                     .FirstAsync(cancellationToken);
 
-   /// <summary>
-   /// Applies an async result-returning function to each element, collecting successes or aggregating errors.
-   /// </summary>
-   /// <typeparam name="T">The source element type.</typeparam>
-   /// <typeparam name="T2">The result element type.</typeparam>
-   /// <param name="source">The source async enumerable.</param>
-   /// <param name="selector">Async function that returns a result for each element.</param>
-   /// <param name="cancellationToken">Cancellation token.</param>
-   /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
-   public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
+    /// <summary>
+    /// Applies an async result-returning function to each element, collecting successes or aggregating errors.
+    /// </summary>
+    /// <typeparam name="T">The source element type.</typeparam>
+    /// <typeparam name="T2">The result element type.</typeparam>
+    /// <param name="source">The source async enumerable.</param>
+    /// <param name="selector">Async function that returns a result for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Success with all results if all succeed, otherwise an error with all failures combined.</returns>
+    public static async ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(this IAsyncEnumerable<T> source, Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)
     {
         var results = new List<T2>();
         var errors = new List<Error>();
 
         await source.IterTask(async item =>
-                              {
-                                  var result = await selector(item);
-                                  result.Match(results.Add, errors.Add);
-                              },
-                              maxDegreeOfParallelism: 1,
-                              cancellationToken);
+        {
+            var result = await selector(item);
+            result.Match(results.Add, errors.Add);
+        }, cancellationToken);
 
         return errors.Count > 0
                 ? errors.Aggregate((first, second) => first + second)
@@ -296,12 +317,10 @@ public static class AsyncEnumerableExtensions
         var hasNone = false;
 
         await source.IterTask(async item =>
-                              {
-                                  var option = await selector(item);
-                                  option.Match(results.Add, () => hasNone = true);
-                              },
-                              maxDegreeOfParallelism: 1,
-                              cancellationToken);
+        {
+            var option = await selector(item);
+            option.Match(results.Add, () => hasNone = true);
+        }, cancellationToken);
 
         return hasNone
                 ? Option.None
@@ -309,15 +328,26 @@ public static class AsyncEnumerableExtensions
     }
 
     /// <summary>
+    /// Executes an async action on each element sequentially.
+    /// </summary>
+    /// <typeparam name="T">The element type.</typeparam>
+    /// <param name="source">The source async enumerable.</param>
+    /// <param name="action">The async action to execute for each element.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A task representing the async operation.</returns>
+    public static ValueTask IterTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, CancellationToken cancellationToken = default) =>
+        source.IterTaskParallel(action, maxDegreeOfParallelism: 1, cancellationToken);
+
+    /// <summary>
     /// Executes an async action on each element in parallel.
     /// </summary>
     /// <typeparam name="T">The element type.</typeparam>
     /// <param name="source">The source async enumerable.</param>
     /// <param name="action">The async action to execute for each element.</param>
-    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism.</param>
+    /// <param name="maxDegreeOfParallelism">Maximum degree of parallelism. Set to <see cref="Option.None"/> for unbounded parallelism.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A task representing the async operation.</returns>
-    public static async ValueTask IterTask<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken)
+    public static async ValueTask IterTaskParallel<T>(this IAsyncEnumerable<T> source, Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)
     {
         var options = new ParallelOptions { CancellationToken = cancellationToken };
         maxDegreeOfParallelism.Iter(max => options.MaxDegreeOfParallelism = max);
