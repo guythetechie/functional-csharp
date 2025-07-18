@@ -96,6 +96,18 @@ public sealed record Either<TLeft, TRight>
 
     public override int GetHashCode() =>
         HashCode.Combine(left, right);
+
+    /// <summary>
+    /// Implicitly converts a left value to Left(left).
+    /// </summary>
+    public static implicit operator Either<TLeft, TRight>(TLeft left) =>
+        Left(left);
+
+    /// <summary>
+    /// Implicitly converts a right value to Right(right).
+    /// </summary>
+    public static implicit operator Either<TLeft, TRight>(TRight right) =>
+        Right(right);
 }
 
 /// <summary>

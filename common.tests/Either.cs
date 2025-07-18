@@ -532,4 +532,30 @@ public class EitherTests
             result.Should().BeLeft().Which.Should().Be(leftValue);
         });
     }
+
+    [Fact]
+    public void Implicit_operator_converts_left_value_to_left_either()
+    {
+        var gen = Gen.String;
+
+        gen.Sample(value =>
+        {
+            Either<string, int> either = value; // Implicit conversion
+
+            either.Should().BeLeft().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void Implicit_operator_converts_right_value_to_right_either()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            Either<string, int> either = value; // Implicit conversion
+
+            either.Should().BeRight().Which.Should().Be(value);
+        });
+    }
 }

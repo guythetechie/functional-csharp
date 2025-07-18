@@ -304,16 +304,11 @@ Result<Payment> paymentResult =
 Asynchronously chains result operations together (monadic bind with async function).
 
 ```csharp
-// Chain async validation and processing steps
 Result<Order> orderResult = Result.Success(orderRequest);
-Result<PaymentResult> paymentResult = await orderResult
-    .BindTask(async req => await PaymentGateway.ValidateAsync(req))
+Result<ValidatedOrder> validatedResult = await orderResult
+    .BindTask(async req => await PaymentGateway.ValidateAsync(req));
+Result<PaymentResult> paymentResult = await validatedResult
     .BindTask(async valid => await PaymentGateway.ChargeAsync(valid));
-
-// Async database operations with error handling
-Result<User> userResult = await Result.Success(userId)
-    .BindTask(async id => await FindUserInDatabaseAsync(id))
-    .BindTask(async user => await UpdateUserLastLoginAsync(user));
 ```
 
 #### LINQ Support
@@ -422,6 +417,10 @@ Either<LocalFile, RemoteFile> remoteSource = Either.Right<LocalFile, RemoteFile>
 // Using static methods
 Either<CachedData, FreshData> cachedResult = Either.Left<CachedData, FreshData>(new CachedData(timestamp, data));
 Either<CachedData, FreshData> freshResult = Either.Right<CachedData, FreshData>(new FreshData(apiResponse));
+
+// Implicit conversion
+Either<string, int> leftValue = "error message";         // Left("error message")
+Either<string, int> rightValue = 42;                     // Right(42)
 ```
 
 #### `T Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight)`
