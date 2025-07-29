@@ -6,7 +6,7 @@ namespace common;
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
 /// <summary>
-/// Represents an optional value that may or may not contain a value.
+/// Represents a type that may or may not contain a value.
 /// </summary>
 public sealed record Option<T>
 #pragma warning restore CA1716 // Identifiers should not match keywords
