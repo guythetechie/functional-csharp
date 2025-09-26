@@ -2,7 +2,6 @@ using common;
 using CsCheck;
 using FluentAssertions;
 using System;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -11,358 +10,575 @@ namespace common.tests;
 public class OptionTests
 {
     [Fact]
-    public void Some_returns_an_option_in_some_state()
+    public void Some_returns_an_option_in_the_some_state()
     {
-        var gen = Gen.String;
+        var gen = Gen.Int;
 
         gen.Sample(value =>
         {
             var option = Option.Some(value);
 
+            // Assert
             option.Should().BeSome().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void None_returns_an_option_in_none_state()
-    {
-        Option<string> option = Option.None;
-
-        option.Should().BeNone();
-    }
-
-    [Fact]
-    public void IsSome_with_some_returns_true()
-    {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
-
-        gen.Sample(option =>
-        {
-            option.IsSome.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void IsSome_with_none_returns_false()
-    {
-        Option<int> option = Option.None;
-
-        option.IsSome.Should().BeFalse();
-    }
-
-    [Fact]
-    public void IsNone_with_some_returns_false()
-    {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
-
-        gen.Sample(option =>
-        {
             option.IsNone.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void IsNone_with_none_returns_true()
+    public void Somes_with_equal_values_are_equal()
     {
-        Option<int> option = Option.None;
+        var gen = Gen.Int;
 
-        option.IsNone.Should().BeTrue();
-    }
-
-    [Fact]
-    public void Map_with_some_applies_function()
-    {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from mapResult in Gen.Int
-                  select (option, mapResult);
-
-        gen.Sample(x =>
+        gen.Sample(value =>
         {
-            var (option, mapResult) = x;
-            var result = option.Map(_ => mapResult);
+            // Arrange
+            var option1 = Option.Some(value);
+            var option2 = Option.Some(value);
 
-            result.Should().BeSome().Which.Should().Be(mapResult);
+            // Act
+            var result = option1 == option2;
+
+            // Assert
+            result.Should().BeTrue();
         });
     }
 
     [Fact]
-    public void Map_with_none_returns_none()
+    public void Somes_with_different_values_are_not_equal()
     {
-        Option<int> option = Option.None;
-        var result = option.Map(x => x * 2);
+        var gen = from x in Gen.Int
+                  from y in Gen.Int
+                  where x != y
+                  select (x, y);
 
-        result.Should().BeNone();
-    }
-
-    [Fact]
-    public async Task MapTask_with_some_applies_function()
-    {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from mapResult in Gen.Int
-                  select (option, mapResult);
-
-        await gen.SampleAsync(async x =>
+        gen.Sample(pair =>
         {
-            var (option, mapResult) = x;
+            // Arrange
+            var (x, y) = pair;
+            var option1 = Option.Some(x);
+            var option2 = Option.Some(y);
 
-            var result = await option.MapTask(_ => ValueTask.FromResult(mapResult));
+            // Act
+            var result = option1 == option2;
 
-            result.Should().BeSome().Which.Should().Be(mapResult);
+            // Assert
+            result.Should().BeFalse();
         });
     }
 
     [Fact]
-    public async Task MapTask_with_none_returns_none()
+    public void Somes_never_equal_nones()
     {
-        Option<int> option = Option.None;
+        var gen = Gen.Int;
 
-        var result = await option.MapTask(x => ValueTask.FromResult(x * 2));
-
-        result.Should().BeNone();
-    }
-
-    [Fact]
-    public void Bind_with_some_applies_function()
-    {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from bindResult in Generator.GenerateOption(Gen.String)
-                  select (option, bindResult);
-
-        gen.Sample(x =>
+        gen.Sample(value =>
         {
-            var (option, bindResult) = x;
-            var result = option.Bind(_ => bindResult);
+            // Arrange
+            var some = Option.Some(value);
+            var none = Option<int>.None();
 
-            result.Should().Be(bindResult);
+            // Act
+            var result = some == none;
+
+            // Assert
+            result.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void Bind_with_none_returns_none()
+    public void Nones_are_equal()
     {
-        var gen = Generator.GenerateOption(Gen.Int);
+        // Arrange
+        var none1 = Option<int>.None();
+        var none2 = Option<int>.None();
 
-        gen.Sample(bindResult =>
+        // Act
+        var result = none1 == none2;
+
+        // Assert
+        result.Should().BeTrue();
+    }
+
+    [Fact]
+    public void GetHashCode_matches_for_matching_somes()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
         {
-            Option<int> option = Option.None;
-            var result = option.Bind(x => bindResult);
-            result.Should().BeNone();
+            // Arrange
+            var option1 = Option.Some(value);
+            var option2 = Option.Some(value);
+
+            // Act
+            var hash1 = option1.GetHashCode();
+            var hash2 = option2.GetHashCode();
+
+            // Assert
+            hash1.Should().Be(hash2);
         });
     }
 
     [Fact]
-    public async Task BindTask_with_some_applies_function()
+    public void GetHashCode_for_none_should_be_zero()
     {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from bindResult in Generator.GenerateOption(Gen.String)
-                  select (option, bindResult);
+        var none = Option<int>.None();
 
-        await gen.SampleAsync(async x =>
-        {
-            var (option, bindResult) = x;
-            var result = await option.BindTask(_ => ValueTask.FromResult(bindResult));
+        var hash = none.GetHashCode();
 
-            result.Should().Be(bindResult);
-        });
+        hash.Should().Be(0);
     }
 
     [Fact]
-    public async Task BindTask_with_none_returns_none()
+    public void None_returns_an_option_in_the_none_state()
     {
-        var gen = Generator.GenerateOption(Gen.Int);
+        var option = Option<int>.None();
 
-        await gen.SampleAsync(async bindResult =>
-        {
-            Option<int> option = Option.None;
-            var result = await option.BindTask(x => ValueTask.FromResult(bindResult));
-            result.Should().BeNone();
-        });
+        // Assert
+        option.Should().BeNone();
+        option.IsSome.Should().BeFalse();
     }
 
     [Fact]
-    public void Where_with_some_and_true_predicate_returns_some()
+    public void Match_with_some_returns_selector_result()
     {
         var gen = from value in Gen.Int
-                  select value;
+                  from selector in Generator.MapSelector
+                  select (value, selector);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (value, selector) = x;
+            var option = Option.Some(value);
+
+            // Act
+            var result = option.Match(selector, () => -1);
+
+            // Assert
+            result.Should().Be(selector(value));
+        });
+    }
+
+    [Fact]
+    public void Match_with_none_returns_default()
+    {
+        var gen = from selector in Generator.MapSelector
+                  from defaultValue in Gen.Int
+                  select (selector, defaultValue);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (selector, defaultValue) = x;
+            var option = Option<int>.None();
+
+            // Act
+            var result = option.Match(selector, () => defaultValue);
+
+            // Assert
+            result.Should().Be(defaultValue);
+        });
+    }
+
+    [Fact]
+    public void Match_with_some_executes_some_action()
+    {
+        var gen = from value in Gen.Int
+                  from someSelector in Generator.MapSelector
+                  from noneSelector in Generator.MapSelector
+                  select (value, someSelector, noneSelector);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (value, someSelector, noneSelector) = x;
+            var (someExecuted, noneExecuted) = (false, false);
+            var (someSelected, noneSelected) = (0, 0);
+            var option = Option.Some(value);
+
+            // Act
+            option.Match(value =>
+            {
+                someExecuted = true;
+                someSelected = someSelector(value);
+            },
+            () =>
+            {
+                noneExecuted = true;
+                noneSelected = noneSelector(value);
+            });
+
+            // Assert
+            someExecuted.Should().BeTrue();
+            someSelected.Should().Be(someSelector(value));
+            noneExecuted.Should().BeFalse();
+            noneSelected.Should().Be(0);
+        });
+    }
+
+    [Fact]
+    public void Match_with_none_executes_none_action()
+    {
+        var gen = from value in Gen.Int
+                  from someSelector in Generator.MapSelector
+                  from noneSelector in Generator.MapSelector
+                  select (value, someSelector, noneSelector);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (value, someSelector, noneSelector) = x;
+            var (someExecuted, noneExecuted) = (false, false);
+            var (someSelected, noneSelected) = (0, 0);
+            var option = Option<int>.None();
+
+            // Act
+            option.Match(i =>
+            {
+                someExecuted = true;
+                someSelected = someSelector(i);
+            },
+            () =>
+            {
+                noneExecuted = true;
+                noneSelected = noneSelector(value);
+            });
+
+            // Assert
+            someExecuted.Should().BeFalse();
+            someSelected.Should().Be(0);
+            noneExecuted.Should().BeTrue();
+            noneSelected.Should().Be(noneSelector(value));
+        });
+    }
+
+    [Fact]
+    public void ToString_with_some_contains_value()
+    {
+        var gen = Gen.Int;
 
         gen.Sample(value =>
         {
             var option = Option.Some(value);
-            var result = option.Where(x => true);
-            result.Should().BeSome().Which.Should().Be(value);
+
+            option.ToString().Should().Contain(value.ToString());
         });
     }
 
     [Fact]
-    public void Where_with_some_and_false_predicate_returns_none()
+    public void ToString_with_none_displays_none()
     {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
+        var option = Option<int>.None();
+
+        option.ToString().Should().Be("None");
+    }
+
+    [Fact]
+    public void Implicit_operator_works_for_none()
+    {
+        // Act
+        Option<int> option = Option.None;
+
+        // Assert
+        option.Should().BeNone();
+    }
+
+    [Fact]
+    public void Option_satisfies_monad_left_identity()
+    {
+        var gen = from value in Gen.Int
+                  from selector in Generator.OptionSelector
+                  select (value, selector);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (value, selector) = x;
+            var option = Option.Some(value);
+
+            // Act
+            var result = option.Bind(selector);
+
+            // Assert
+            result.Should().Be(selector(value));
+        });
+    }
+
+    [Fact]
+    public void Option_satisfies_monad_right_identity()
+    {
+        var gen = Generator.Option;
 
         gen.Sample(option =>
         {
-            var result = option.Where(x => false);
-            result.Should().BeNone();
+            var result = option.Bind(Option.Some);
+
+            result.Should().Be(option);
         });
     }
 
     [Fact]
-    public void Where_with_none_and_true_predicate_returns_none()
+    public void Option_satisfies_monad_associativity()
     {
-        Option<int> option = Option.None;
-
-        var result = option.Where(x => true);
-
-        result.Should().BeNone();
-    }
-
-    [Fact]
-    public void Where_with_none_and_false_predicate_returns_none()
-    {
-        Option<int> option = Option.None;
-
-        var result = option.Where(x => false);
-
-        result.Should().BeNone();
-    }
-
-    [Fact]
-    public void Match_with_some_returns_some_function_result()
-    {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from someFunctionResult in Gen.Int
-                  select (option, someFunctionResult);
+        var gen = from option in Generator.Option
+                  from selector1 in Generator.OptionSelector
+                  from selector2 in Generator.OptionSelector
+                  select (option, selector1, selector2);
 
         gen.Sample(x =>
         {
-            var (option, someFunctionResult) = x;
-            var result = option.Match(_ => someFunctionResult, () => 1);
+            // Arrange
+            var (option, selector1, selector2) = x;
 
-            result.Should().Be(someFunctionResult);
+            // Act
+            var path1 = option.Bind(selector1)
+                              .Bind(selector2);
+
+            var path2 = option.Bind(x => selector1(x).Bind(selector2));
+
+            // Assert
+            path1.Should().Be(path2);
         });
     }
 
     [Fact]
-    public void Match_with_none_returns_none_function_result()
+    public void Map_is_equivalent_to_bind_then_return()
     {
-        var gen = Gen.Int;
+        var gen = from option in Generator.Option
+                  from selector in Generator.MapSelector
+                  select (option, selector);
 
-        gen.Sample(noneFunctionResult =>
+        gen.Sample(x =>
         {
-            Option<int> option = Option.None;
-            var result = option.Match(_ => 1, () => noneFunctionResult);
+            // Arrange
+            var (option, selector) = x;
 
-            result.Should().Be(noneFunctionResult);
+            // Act
+            var path1 = option.Map(selector);
+            var path2 = option.Bind(x => Option.Some(selector(x)));
+
+            // Assert
+            path1.Should().Be(path2);
         });
     }
 
     [Fact]
-    public void Match_with_some_calls_some_action()
+    public void Where_is_a_monadic_guard()
     {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
+        var gen = from option in Generator.Option
+                  from predicate in Generator.Predicate
+                  select (option, predicate);
 
-        gen.Sample(option =>
+        gen.Sample(x =>
         {
-            var called = false;
-            option.Match(_ => called = true, () => { });
+            // Arrange
+            var (option, predicate) = x;
 
-            called.Should().BeTrue();
+            // Act
+            var path1 = option.Where(predicate);
+            var path2 = option.Bind(x => predicate(x) ? Option.Some(x) : Option.None);
+
+            // Assert
+            path1.Should().Be(path2);
         });
     }
 
     [Fact]
-    public void Match_with_none_calls_none_action()
+    public async Task MapTask_lifts_synchronous_Map()
     {
-        Option<int> option = Option.None;
-        var called = false;
+        var gen = from option in Generator.Option
+                  from selector in Generator.MapSelector
+                  select (option, selector);
 
-        option.Match(_ => { }, () => called = true);
-
-        called.Should().BeTrue();
-    }
-
-    [Fact]
-    public void IfNone_with_value_func_and_some_returns_value()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
+        await gen.SampleAsync(async x =>
         {
-            var option = Option.Some(value);
-            var result = option.IfNone(() => 10);
-            result.Should().Be(value);
+            // Arrange
+            var (option, selector) = x;
+
+            // Act
+            var path1 = option.Map(selector);
+            var path2 = await option.MapTask(i => ValueTask.FromResult(selector(i)));
+
+            // Assert
+            path1.Should().Be(path2);
         });
     }
 
     [Fact]
-    public void IfNone_with_value_func_and_none_returns_fallback()
+    public async Task BindTask_lifts_synchronous_Bind()
     {
-        var gen = Gen.Int;
+        var gen = from option in Generator.Option
+                  from selector in Generator.OptionSelector
+                  select (option, selector);
 
-        gen.Sample(fallback =>
+        await gen.SampleAsync(async x =>
         {
-            Option<int> option = Option.None;
-            var result = option.IfNone(() => fallback);
-            result.Should().Be(fallback);
+            // Arrange
+            var (option, selector) = x;
+
+            // Act
+            var path1 = option.Bind(selector);
+            var path2 = await option.BindTask(i => ValueTask.FromResult(selector(i)));
+
+            // Assert
+            path1.Should().Be(path2);
         });
     }
 
     [Fact]
-    public void IfNone_with_option_func_and_some_returns_value()
+    public void IfNone_with_some_returns_the_value()
     {
         var gen = from value in Gen.Int
-                  from fallback in Generator.GenerateOption(Gen.Int)
-                  select (value, fallback);
+                  from alternative in Gen.Int
+                  select (value, alternative);
 
         gen.Sample(x =>
         {
-            var (value, fallback) = x;
+            // Arrange
+            var (value, alternative) = x;
             var option = Option.Some(value);
+            var alternativeExecuted = false;
+            var alternativeF = () =>
+            {
+                alternativeExecuted = true;
+                return alternative;
+            };
 
-            var result = option.IfNone(() => fallback);
+            // Act
+            var result = option.IfNone(alternativeF);
 
-            result.Should().BeSome().Which.Should().Be(value);
+            // Assert
+            result.Should().Be(value);
+            alternativeExecuted.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void IfNone_with_option_func_and_none_returns_fallback()
+    public void IfNone_with_none_returns_the_alternative()
     {
-        var gen = Generator.GenerateOption(Gen.Int);
+        var gen = Gen.Int;
 
-        gen.Sample(fallback =>
+        gen.Sample(alternative =>
         {
-            Option<int> option = Option.None;
+            // Arrange
+            var option = Option<int>.None();
 
-            var result = option.IfNone(() => fallback);
+            // Act
+            var result = option.IfNone(() => alternative);
 
-            result.Should().Be(fallback);
+            // Assert
+            result.Should().Be(alternative);
         });
     }
 
     [Fact]
-    public void IfNoneThrow_with_some_returns_value()
+    public void IfNone_with_some_ignores_option_fallback()
+    {
+        var gen = from value in Gen.Int
+                  from alternative in Gen.Int
+                  select (value, alternative);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (value, alternative) = x;
+            var option = Option.Some(value);
+            var alternativeExecuted = false;
+            var alternativeF = () =>
+            {
+                alternativeExecuted = true;
+                return Option.Some(alternative);
+            };
+
+            // Act
+            var result = option.IfNone(alternativeF);
+
+            // Assert
+            result.Should().Be(value);
+            alternativeExecuted.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void IfNone_with_none_returns_option_fallback()
+    {
+        var gen = Generator.Option;
+
+        gen.Sample(alternativeOption =>
+        {
+            // Arrange
+            var option = Option<int>.None();
+
+            // Act
+            var result = option.IfNone(() => alternativeOption);
+
+            // Assert
+            result.Should().Be(alternativeOption);
+        });
+    }
+
+    [Fact]
+    public void IfNoneThrow_with_some_returns_the_value()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
+            // Arrange
             var option = Option.Some(value);
-            var result = option.IfNoneThrow(() => new UnreachableException());
+            var exceptionFactoryCalled = false;
+            var exceptionFactory = () =>
+            {
+                exceptionFactoryCalled = true;
+                return new InvalidOperationException("should not be called");
+            };
+
+            // Act
+            var result = option.IfNoneThrow(exceptionFactory);
+
+            // Assert
             result.Should().Be(value);
+            exceptionFactoryCalled.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void IfNoneNull_with_some_returns_value()
+    public void IfNoneThrow_with_none_throws_the_exception()
+    {
+        var gen = from message in Gen.String
+                  where string.IsNullOrWhiteSpace(message) is false
+                  select message;
+
+        gen.Sample(message =>
+        {
+            // Arrange
+            var option = Option<int>.None();
+            var exceptionFactory = () => new InvalidOperationException(message);
+
+            // Act
+            var action = () => option.IfNoneThrow(exceptionFactory);
+
+            // Assert
+            action.Should().Throw<InvalidOperationException>()
+                  .WithMessage(message);
+        });
+    }
+
+    [Fact]
+    public void IfNoneNull_with_some_returns_the_value()
     {
         var gen = Gen.String;
 
         gen.Sample(value =>
         {
-            Option<string> option = Option.Some(value);
+            // Arrange
+            var option = Option.Some(value);
 
+            // Act
             var result = option.IfNoneNull();
 
+            // Assert
             result.Should().Be(value);
         });
     }
@@ -370,24 +586,29 @@ public class OptionTests
     [Fact]
     public void IfNoneNull_with_none_returns_null()
     {
-        Option<string> option = Option.None;
+        var option = Option<string>.None();
 
+        // Act
         var result = option.IfNoneNull();
 
+        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
-    public void IfNoneNullable_with_some_returns_value()
+    public void IfNoneNullable_with_some_returns_the_value()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
-            Option<int> option = Option.Some(value);
+            // Arrange
+            var option = Option.Some(value);
 
+            // Act
             var result = option.IfNoneNullable();
 
+            // Assert
             result.Should().Be(value);
         });
     }
@@ -395,265 +616,113 @@ public class OptionTests
     [Fact]
     public void IfNoneNullable_with_none_returns_null()
     {
-        Option<int> option = Option.None;
+        var option = Option<int>.None();
 
+        // Act
         var result = option.IfNoneNullable();
 
+        // Assert
         result.Should().BeNull();
     }
 
     [Fact]
-    public void IfNoneThrow_with_none_throws_exception()
-    {
-        var gen = from exceptionMessage in Gen.String
-                      // .WithMessage assertion does not support empty strings
-                  where string.IsNullOrWhiteSpace(exceptionMessage) is false
-                  select new InvalidOperationException(exceptionMessage);
-
-        gen.Sample(exception =>
-        {
-            Option<int> option = Option.None;
-
-            var action = () => option.IfNoneThrow(() => exception);
-
-            action.Should().Throw<Exception>().WithMessage(exception.Message).And.Should().BeOfType(exception.GetType());
-        });
-    }
-
-    [Fact]
-    public void Iter_with_some_calls_action()
-    {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
-
-        gen.Sample(option =>
-        {
-            var called = false;
-            option.Iter(_ => called = true);
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void Iter_with_none_does_not_call_action()
-    {
-        Option<int> option = Option.None;
-        var called = false;
-
-        option.Iter(x => called = true);
-
-        called.Should().BeFalse();
-    }
-
-    [Fact]
-    public async Task IterTask_with_some_calls_action()
-    {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
-
-        await gen.SampleAsync(async option =>
-        {
-            var called = false;
-
-            await option.IterTask(async _ =>
-            {
-                await ValueTask.CompletedTask;
-                called = true;
-            });
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public async Task IterTask_with_none_does_not_call_action()
-    {
-        Option<int> option = Option.None;
-        var called = false;
-
-        await option.IterTask(async x =>
-        {
-            await ValueTask.CompletedTask;
-            called = true;
-        });
-
-        called.Should().BeFalse();
-    }
-
-    [Fact]
-    public void Implicit_conversion_from_value()
+    public void Iter_with_some_executes_action()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
-            Option<int> option = value;
-            option.Should().BeSome().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Implicit_conversion_from_none()
-    {
-        Option<int> option = Option.None;
-
-        option.Should().BeNone();
-    }
-
-    [Fact]
-    public void Equals_with_some_and_same_value_returns_true()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            var option1 = Option.Some(value);
-            var option2 = Option.Some(value);
-
-            var equals = option1.Equals(option2);
-
-            equals.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void Equals_with_some_and_different_values_returns_false()
-    {
-        var gen = from value1 in Gen.Int
-                  from value2 in Gen.Int
-                  where value1 != value2
-                  select (value1, value2);
-
-        gen.Sample(x =>
-        {
-            var (value1, value2) = x;
-            var option1 = Option.Some(value1);
-            var option2 = Option.Some(value2);
-
-            var equals = option1.Equals(option2);
-
-            equals.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Equals_with_some_and_none_returns_false()
-    {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
-
-        gen.Sample(option =>
-        {
-            Option<int> noneOption = Option.None;
-
-            var equals = option.Equals(noneOption);
-
-            equals.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Equals_with_none_and_none_returns_true()
-    {
-        Option<int> option1 = Option.None;
-        Option<int> option2 = Option.None;
-
-        var equals = option1.Equals(option2);
-
-        equals.Should().BeTrue();
-    }
-
-    [Fact]
-    public void LINQ_query_syntax_with_somes_returns_some()
-    {
-        var gen = from option1 in Generator.GenerateSomeOption(Gen.Int)
-                  from option2 in Generator.GenerateSomeOption(Gen.Int)
-                  from innerResult in Gen.Int
-                  select (option1, option2, innerResult);
-
-        gen.Sample(x =>
-        {
-            var (option1, option2, innerResult) = x;
-
-            var result = from _ in option1
-                         from __ in option2
-                         select innerResult;
-
-            result.Should().BeSome().Which.Should().Be(innerResult);
-        });
-    }
-
-    [Fact]
-    public void LINQ_query_syntax_with_none_returns_none()
-    {
-        var gen = from option in Generator.GenerateSomeOption(Gen.Int)
-                  from innerResult in Gen.Int
-                  select (option, innerResult);
-
-        gen.Sample(x =>
-        {
-            var (option, innerResult) = x;
-
-            var result = from _ in option
-                         from __ in Option<int>.None()
-                         select innerResult;
-
-            result.Should().BeNone();
-        });
-    }
-
-    [Fact]
-    public void LINQ_query_syntax_where_with_some_and_true_predicate_returns_some()
-    {
-        var gen = from value in Gen.Int
-                  select value;
-
-        gen.Sample(value =>
-        {
+            // Arrange
             var option = Option.Some(value);
 
-            var result = from _ in option
-                         where true
-                         select value;
+            var counter = 0;
+            var action = (int value) =>
+            {
+                counter = value;
+            };
 
-            result.Should().BeSome().Which.Should().Be(value);
+            // Act
+            option.Iter(action);
+
+            // Assert
+            counter.Should().Be(value);
         });
     }
 
     [Fact]
-    public void LINQ_query_syntax_where_with_some_and_false_predicate_returns_none()
+    public void Iter_with_none_does_not_execute_action()
     {
-        var gen = Generator.GenerateSomeOption(Gen.Int);
+        var option = Option<int>.None();
 
-        gen.Sample(option =>
+        var counter = 0;
+        var action = (int _) =>
         {
-            var result = from value in option
-                         where false
-                         select value;
+            counter++;
+        };
 
-            result.Should().BeNone();
+        // Act
+        option.Iter(action);
+
+        // Assert
+        counter.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task IterTask_with_some_executes_action()
+    {
+        var gen = Gen.Int;
+
+        await gen.SampleAsync(async value =>
+        {
+            // Arrange
+            var option = Option.Some(value);
+
+            var counter = 0;
+            async ValueTask action(int value)
+            {
+                await ValueTask.CompletedTask;
+                counter = value;
+            }
+
+            // Act
+            await option.IterTask(action);
+
+            // Assert
+            counter.Should().Be(value);
         });
     }
 
     [Fact]
-    public void LINQ_query_syntax_where_with_none_and_true_predicate_returns_none()
+    public async Task IterTask_with_none_does_not_execute_action()
     {
-        Option<int> option = Option.None;
+        var option = Option<int>.None();
 
-        var result = from value in option
-                     where true
-                     select value;
+        var counter = 0;
+        async ValueTask action(int value)
+        {
+            await ValueTask.CompletedTask;
+            counter = value;
+        }
 
-        result.Should().BeNone();
+        // Act
+        await option.IterTask(action);
+
+        // Assert
+        counter.Should().Be(0);
     }
 
     [Fact]
-    public void LINQ_query_syntax_where_with_none_and_false_predicate_returns_none()
+    public void Implicit_operator_works_for_some()
     {
-        Option<int> option = Option.None;
+        var gen = Gen.Int;
 
-        var result = from value in option
-                     where false
-                     select value;
+        gen.Sample(value =>
+        {
+            // Act
+            Option<int> option = value;
 
-        result.Should().BeNone();
+            // Assert
+            option.Should().BeSome().Which.Should().Be(value);
+        });
     }
 }

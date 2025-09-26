@@ -114,9 +114,9 @@ public class EnumerableExtensionsTests
 
         gen.Sample(array =>
         {
-            Option<(string, int Index)> selector((int item, int index) pair)
+            Option<(int, int Index)> selector((int item, int index) pair)
             {
-                var gen = from option in Generator.GenerateOption(Gen.String)
+                var gen = from option in Generator.Option
                           select from x in option
                                  select (x, pair.index);
 
@@ -154,9 +154,7 @@ public class EnumerableExtensionsTests
 
         gen.Sample(array =>
         {
-            var selector = Generator.AllNonesSelector;
-
-            var result = array.Choose(selector);
+            var result = array.Choose(Selectors.AllNones);
 
             result.Should().BeEmpty();
         });
@@ -188,9 +186,9 @@ public class EnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
-            ValueTask<Option<(string, int Index)>> selector((int item, int index) pair)
+            ValueTask<Option<(int, int Index)>> selector((int item, int index) pair)
             {
-                var gen = from option in Generator.GenerateOption(Gen.String)
+                var gen = from option in Generator.Option
                           select from x in option
                                  select (x, pair.index);
 
@@ -265,9 +263,7 @@ public class EnumerableExtensionsTests
 
         gen.Sample(array =>
         {
-            var selector = Generator.AllNonesSelector;
-
-            var result = array.Pick(selector);
+            var result = array.Pick(Selectors.AllNones);
 
             result.Should().BeNone();
         });
@@ -463,7 +459,7 @@ public class EnumerableExtensionsTests
     public void IterParallel_calls_action_for_each_element()
     {
         var gen = from array in Gen.Int.Array
-                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1].ToOption()
                   select (array, maxDegreesOfParallelism);
 
         gen.Sample(x =>
@@ -561,7 +557,7 @@ public class EnumerableExtensionsTests
     public async Task IterTaskParallel_calls_action_for_each_element()
     {
         var gen = from array in Gen.Int.Array
-                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1].ToOption()
                   select (array, maxDegreesOfParallelism);
 
         await gen.SampleAsync(async x =>
@@ -751,7 +747,7 @@ public class AsyncEnumerableExtensionsTests
         {
             Option<(string, int Index)> selector((int item, int index) pair)
             {
-                var gen = from option in Generator.GenerateOption(Gen.String)
+                var gen = from option in Gen.String.ToOption()
                           select from x in option
                                  select (x, pair.index);
 
@@ -795,9 +791,7 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async source =>
         {
-            var selector = Generator.AllNonesSelector;
-
-            var result = source.Choose(selector);
+            var result = source.Choose(Selectors.AllNones);
 
             var resultArray = await result.ToArrayAsync(CancellationToken);
             resultArray.Should().BeEmpty();
@@ -827,9 +821,7 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async source =>
         {
-            var selector = Generator.AllNonesSelector;
-
-            var result = await source.Pick(selector, CancellationToken);
+            var result = await source.Pick(Selectors.AllNones, CancellationToken);
 
             result.Should().BeNone();
         });
@@ -1047,7 +1039,7 @@ public class AsyncEnumerableExtensionsTests
     public async Task IterTaskParallel_calls_action_for_each_element()
     {
         var gen = from array in Gen.Int.Array
-                  from maxDegreesOfParallelism in Generator.GenerateOption(Gen.Int[1, array.Length + 1])
+                  from maxDegreesOfParallelism in Gen.Int[1, array.Length + 1].ToOption()
                   select (array.ToAsyncEnumerable(), maxDegreesOfParallelism);
 
         await gen.SampleAsync(async x =>
@@ -1249,31 +1241,6 @@ public class DictionaryExtensionsTests
             result.Should().BeSome().Which.Should().Be(value);
         });
     }
-}
-
-file static class Selectors
-{
-    public static Func<int, Result<int>> MixedResult { get; } =
-        i => i % 2 == 0
-            ? i + 2
-            : Error.From($"Odd number: {i}");
-
-    public static Func<int, ValueTask<Result<int>>> MixedResultAsync { get; } =
-        i => ValueTask.FromResult(MixedResult(i));
-
-    public static Func<int, ValueTask<Result<int>>> ResultIdentityAsync { get; } =
-        i => ValueTask.FromResult(Result.Success(i));
-
-    public static Func<int, Option<int>> MixedOption { get; } =
-        i => i % 3 == 0
-            ? i - 1
-            : Option.None;
-
-    public static Func<int, ValueTask<Option<int>>> MixedOptionAsync { get; } =
-        i => ValueTask.FromResult(MixedOption(i));
-
-    public static Func<int, ValueTask<Option<int>>> OptionIdentityAsync { get; } =
-        i => ValueTask.FromResult(Option.Some(i));
 }
 
 file static class Extensions
