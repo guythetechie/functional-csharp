@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace common.tests;
 
@@ -19,6 +20,50 @@ internal static class Generator
 
     public static Gen<Error> Error { get; } =
         Gen.OneOf(NonExceptionalError, ExceptionalError);
+
+    public static Gen<Func<int, Option<int>>> AllSomesSelector { get; } =
+        from option in GenerateSomeOption(Gen.Int)
+        select new Func<int, Option<int>>(_ => option);
+
+    public static Gen<Func<int, ValueTask<Option<int>>>> AllSomesAsyncSelector { get; } =
+        from option in GenerateSomeOption(Gen.Int)
+        select new Func<int, ValueTask<Option<int>>>(_ => ValueTask.FromResult(option));
+
+    public static Func<int, Option<int>> AllNonesSelector { get; } =
+        _ => Option.None;
+
+    public static Func<int, ValueTask<Option<int>>> AllNonesAsyncSelector { get; } =
+        _ => ValueTask.FromResult(Option<int>.None());
+
+    public static Gen<Func<int, Option<int>>> OptionSelector { get; } =
+        from option in GenerateOption(Gen.Int)
+        select new Func<int, Option<int>>(_ => option);
+
+    public static Gen<Func<int, ValueTask<Option<int>>>> OptionAsyncSelector { get; } =
+        from option in GenerateOption(Gen.Int)
+        select new Func<int, ValueTask<Option<int>>>(_ => ValueTask.FromResult(option));
+
+    public static Gen<Func<int, Result<int>>> AllSuccessesSelector { get; } =
+        from result in GenerateSuccessResult(Gen.Int)
+        select new Func<int, Result<int>>(_ => result);
+
+    public static Gen<Func<int, ValueTask<Result<int>>>> AllSuccessesAsyncSelector { get; } =
+        from result in GenerateSuccessResult(Gen.Int)
+        select new Func<int, ValueTask<Result<int>>>(_ => ValueTask.FromResult(result));
+
+    public static Func<int, Result<int>> AllErrorsSelector { get; } =
+        _ => Result.Error<int>(common.Error.From("error"));
+
+    public static Func<int, ValueTask<Result<int>>> AllErrorsAsyncSelector { get; } =
+        _ => ValueTask.FromResult(Result.Error<int>(common.Error.From("error")));
+
+    public static Gen<Func<int, Result<int>>> ResultSelector { get; } =
+        from result in GenerateResult(Gen.Int)
+        select new Func<int, Result<int>>(_ => result);
+
+    public static Gen<Func<int, ValueTask<Result<int>>>> ResultAsyncSelector { get; } =
+        from result in GenerateResult(Gen.Int)
+        select new Func<int, ValueTask<Result<int>>>(_ => ValueTask.FromResult(result));
 
     public static Gen<Option<T>> GenerateSomeOption<T>(Gen<T> gen) =>
         from t in gen
@@ -71,4 +116,8 @@ internal static class Generator
                                                    return list;
                                                }))
                .Select(list => list.ToImmutableArray());
+
+    public static Gen<Func<int, T>> GenerateIntFunc<T>(Gen<T> gen) =>
+        from t in gen
+        select new Func<int, T>(_ => t);
 }
