@@ -1,6 +1,6 @@
 # Functional C#
 
-A minimal set of functional programming classes for C#. Copy any class you need directly into your project — no NuGet package will be provided, and no external depencies are required. For more robust and feature-rich libraries, see [LanguageExt](https://github.com/louthy/language-ext) or [CSharpFunctionalExtensions](https://github.com/vkhorikov/CSharpFunctionalExtensions).
+A minimal set of functional programming classes for C#. Copy any class you need directly into your project. No NuGet package will be provided, and no external dependencies are required. For more robust and feature-rich libraries, see [LanguageExt](https://github.com/louthy/language-ext) or [CSharpFunctionalExtensions](https://github.com/vkhorikov/CSharpFunctionalExtensions).
 
 > **Note:** Null checks are intentionally omitted; we rely on the compiler’s nullable reference type analysis for safety.
 
@@ -118,7 +118,7 @@ Filters an option using a predicate.
 
 ```csharp
 Option<int> userAge = Option.Some(17);
-Option<int> adultAge = userAge.Where(age => age >= 18) // None (17 is less than 18)
+Option<int> adultAge = userAge.Where(age => age >= 18); // None (17 is less than 18)
 
 Option<int> validAge = Option.Some(25);
 Option<int> filteredAge = validAge.Where(age => age >= 18); // Some(25)
@@ -199,6 +199,8 @@ Converts the option to a nullable reference type.
 Option<string> userName = GetUserName();
 string? nullableUserName = userName.IfNoneNull(); // Returns null if None, otherwise the string value
 
+```
+
 #### `T? IfNoneNullable()`
 Converts the option to a nullable value type.
 
@@ -221,7 +223,7 @@ Result<int> ageResult = Result.Success(25);
 // Creating error results
 Result<User> errorResult = Result.Error<User>(Error.From("User not found"));
 Result<int> negativeResult = Result.Error("Value cannot be negative."); // Uses implicit conversion of string -> Error
-Result<Request> parseResult = Result.Error(new JsonException("Could not parse request.")) // Uses implicit conversion of Exception -> Error
+Result<Request> parseResult = Result.Error(new JsonException("Could not parse request.")); // Uses implicit conversion of Exception -> Error
 
 // Implicit conversion
 Result<string> fromValue = "success";                    // Success
@@ -461,15 +463,15 @@ Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName);
 Chains either operations together (monadic bind).
 
 ```csharp
-// Try local cache then fallback to remote
-Either<CacheMiss, Product> productSrc =
-    Cache.TryGet(productId)
-         .MapRight<Product>(p => p)
-         .IfLeft(_ => RemoteApi.FetchProduct(productId));
+// Chain operations that return Either results
+Either<CacheError, Product> productResult =
+    LoadProductDefinition(productId)
+        .Bind(def => ValidateProduct(def))
+        .Bind(valid => FetchInventory(valid));
 
-productSrc.Match(
-    _       => Console.WriteLine("Loaded from cache"),
-    product => Console.WriteLine($"Fetched {product.Name} from API")
+productResult.Match(
+    error   => Console.WriteLine($"Failed: {error}"),
+    product => Console.WriteLine($"Ready to ship {product.Name}")
 );
 ```
 

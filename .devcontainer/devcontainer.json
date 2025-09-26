@@ -1,12 +1,13 @@
 {
     "name": "Dev container",
-    "image": "mcr.microsoft.com/dotnet/sdk:10.0-preview",
+    "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
     "features": {
         "ghcr.io/devcontainers/features/dotnet:2": {
-            "version": "9.0"
+            "version": "10.0",
+            "additionalVersions": "9.0"
         },
         "ghcr.io/devcontainers/features/git:1": {},
-        "ghcr.io/devcontainers/features/github-cli:1": {}
+        "ghcr.io/devcontainers/features/github-cli:1": {},
     },
     "customizations": {
         "vscode": {
@@ -14,8 +15,17 @@
                 "ms-dotnettools.csdevkit",
                 "GitHub.vscode-github-actions",
                 "GitHub.copilot",
+                "GitHub.copilot-chat",
                 "redhat.vscode-yaml"
-            ]
+            ],
+            "mcp": {
+                "servers": {
+                    "microsoft.docs.mcp": {
+                        "type": "http",
+                        "url": "https://learn.microsoft.com/api/mcp"
+                    }
+                }
+            }
         }
     }
 }

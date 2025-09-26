@@ -2,7 +2,6 @@ using common;
 using CsCheck;
 using FluentAssertions;
 using System;
-using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -78,13 +77,53 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void Choose_result_length_never_exceeds_source()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            Option<string> selector(int x) => Generator.GenerateOption(Gen.String).Single();
+
+            var result = array.Choose(selector);
+
+            result.Should().HaveCountLessThanOrEqualTo(array.Length);
+        });
+    }
+
+    [Fact]
+    public void Choose_maintains_order_of_elements()
+    {
+        var gen = Gen.Int.Array;
+
+        gen.Sample(array =>
+        {
+            Option<(string, int Index)> selector((int item, int index) pair)
+            {
+                var gen = from option in Generator.GenerateOption(Gen.String)
+                          select from x in option
+                                 select (x, pair.index);
+
+                return gen.Single();
+            }
+
+            var result = array.Select((item, index) => (item, index))
+                              .Choose(selector);
+
+            result.Select(x => x.Index).Should().BeInAscendingOrder();
+        });
+    }
+
+    [Fact]
     public void Choose_with_all_somes_has_same_count_as_original()
     {
         var gen = Gen.Int.Array;
 
         gen.Sample(array =>
         {
-            var result = array.Choose(x => Option.Some(x * 2));
+            Option<string> selector(int x) => Option.Some(Gen.String.Single());
+
+            var result = array.Choose(selector);
 
             result.Should().HaveSameCount(array);
         });
@@ -97,25 +136,93 @@ public class EnumerableExtensionsTests
 
         gen.Sample(array =>
         {
-            var result = array.Choose(_ => Option<int>.None());
+            Option<string> selector(int x) => Option.None;
+
+            var result = array.Choose(selector);
 
             result.Should().BeEmpty();
         });
     }
 
     [Fact]
-    public void Choose_with_mixed_some_and_none_returns_only_some_values()
+    public async Task Choose_with_async_selector_result_length_never_exceeds_source()
     {
         var gen = Gen.Int.Array;
 
-        gen.Sample(array =>
+        await gen.SampleAsync(async array =>
         {
-            Option<int> chooser(int x) => x % 2 == 0 ? Option.Some(x) : Option.None;
+            ValueTask<Option<string>> selector(int x)
+            {
+                var optionGenerator = Generator.GenerateOption(Gen.String);
+                var option = optionGenerator.Single();
+                return ValueTask.FromResult(option);
+            }
 
-            var result = array.Choose(chooser);
+            var result = array.Choose(selector);
 
-            var expected = array.Where(x => x % 2 == 0);
-            result.Should().BeEquivalentTo(expected);
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            resultArray.Should().HaveCountLessThanOrEqualTo(array.Length);
+        });
+    }
+
+    [Fact]
+    public async Task Choose_with_async_selector_maintains_order_of_elements()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            ValueTask<Option<(string, int Index)>> selector((int item, int index) pair)
+            {
+                var gen = from option in Generator.GenerateOption(Gen.String)
+                          select from x in option
+                                 select (x, pair.index);
+
+                return ValueTask.FromResult(gen.Single());
+            }
+
+            var result = array.Select((item, index) => (item, index))
+                              .Choose(selector);
+
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            resultArray.Select(x => x.Index).Should().BeInAscendingOrder();
+        });
+    }
+
+    [Fact]
+    public async Task Choose_with_async_selector_all_somes_has_same_count_as_original()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            ValueTask<Option<string>> selector(int x)
+            {
+                var stringValue = Gen.String.Single();
+                var option = Option.Some(stringValue);
+                return ValueTask.FromResult(option);
+            }
+
+            var result = array.Choose(selector);
+
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            resultArray.Should().HaveSameCount(array);
+        });
+    }
+
+    [Fact]
+    public async Task Choose_with_async_selector_all_nones_returns_an_empty_sequence()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            ValueTask<Option<string>> selector(int x) => ValueTask.FromResult(Option<string>.None());
+
+            var result = array.Choose(selector);
+
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            resultArray.Should().BeEmpty();
         });
     }
 
@@ -528,18 +635,65 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
+    public async Task Choose_result_length_never_exceeds_source()
+    {
+        var gen = from array in Gen.Int.Array
+                  select array.ToAsyncEnumerable();
+
+        await gen.SampleAsync(async source =>
+        {
+            Option<string> selector(int x) => Generator.GenerateOption(Gen.String).Single();
+
+            var result = source.Choose(selector);
+
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            var sourceLength = await source.CountAsync(TestContext.Current.CancellationToken);
+            resultArray.Should().HaveCountLessThanOrEqualTo(sourceLength);
+        });
+    }
+
+    [Fact]
+    public async Task Choose_maintains_order_of_elements()
+    {
+        var gen = from array in Gen.Int.Array
+                  select array.ToAsyncEnumerable();
+
+        await gen.SampleAsync(async source =>
+        {
+            Option<(string, int Index)> selector((int item, int index) pair)
+            {
+                var gen = from option in Generator.GenerateOption(Gen.String)
+                          select from x in option
+                                 select (x, pair.index);
+
+                return gen.Single();
+            }
+
+            var result = source.Select((item, index) => (item, index))
+                                .Choose(selector);
+
+            var resultIndexes = await result.Select(x => x.Index)
+                                            .ToArrayAsync(TestContext.Current.CancellationToken);
+
+            resultIndexes.Should().BeInAscendingOrder();
+        });
+    }
+
+    [Fact]
     public async Task Choose_with_all_somes_has_same_count_as_original()
     {
         var gen = from array in Gen.Int.Array
                   select array.ToAsyncEnumerable();
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async source =>
         {
-            var result = array.Choose(x => Option.Some(x * 2));
+            Option<string> selector(int x) => Option.Some(Gen.String.Single());
 
-            var actual = await result.ToArrayAsync(TestContext.Current.CancellationToken);
-            var expected = await result.ToArrayAsync(TestContext.Current.CancellationToken);
-            actual.Should().HaveSameCount(expected);
+            var result = source.Choose(selector);
+
+            var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
+            var sourceArray = await source.ToArrayAsync(TestContext.Current.CancellationToken);
+            resultArray.Should().HaveSameCount(sourceArray);
         });
     }
 
@@ -549,30 +703,14 @@ public class AsyncEnumerableExtensionsTests
         var gen = from array in Gen.Int.Array
                   select array.ToAsyncEnumerable();
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async source =>
         {
-            var result = array.Choose(_ => Option<int>.None());
+            Option<string> selector(int x) => Option.None;
+
+            var result = source.Choose(selector);
 
             var resultArray = await result.ToArrayAsync(TestContext.Current.CancellationToken);
             resultArray.Should().BeEmpty();
-        });
-    }
-
-    [Fact]
-    public async Task Choose_with_mixed_some_and_none_returns_only_some_values()
-    {
-        var gen = from array in Gen.Int.Array
-                  select array.ToAsyncEnumerable();
-
-        await gen.SampleAsync(async array =>
-        {
-            Option<int> chooser(int x) => x % 2 == 0 ? Option.Some(x) : Option.None;
-
-            var result = array.Choose(chooser);
-
-            var expected = await array.Where(x => x % 2 == 0).ToArrayAsync(TestContext.Current.CancellationToken);
-            var actual = await result.ToArrayAsync(TestContext.Current.CancellationToken);
-            actual.Should().BeEquivalentTo(expected);
         });
     }
 
@@ -685,7 +823,8 @@ public class AsyncEnumerableExtensionsTests
 
             result.Should().BeNone();
         });
-    }    [Fact]
+    }
+    [Fact]
     public async Task IterTask_calls_action_for_each_element()
     {
         var gen = Gen.Int.Array;
