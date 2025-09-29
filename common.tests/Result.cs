@@ -10,457 +10,680 @@ namespace common.tests;
 public class ResultTests
 {
     [Fact]
-    public void Success_returns_a_result_in_success_state()
+    public void Success_returns_a_result_in_the_success_state()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
+            // Act
             var result = Result.Success(value);
 
+            // Assert
             result.Should().BeSuccess().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Error_returns_a_result_in_error_state()
-    {
-        var gen = Generator.Error;
-
-        gen.Sample(error =>
-        {
-            var result = Result.Error<int>(error);
-
-            result.Should().BeError().Which.Should().Be(error);
-        });
-    }
-
-    [Fact]
-    public void IsSuccess_returns_true_for_success_result()
-    {
-        var gen = Generator.GenerateSuccessResult(Gen.Int);
-
-        gen.Sample(result =>
-        {
-            result.IsSuccess.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void IsSuccess_returns_false_for_error_result()
-    {
-        var gen = Generator.GenerateErrorResult<int>();
-
-        gen.Sample(result =>
-        {
-            result.IsSuccess.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void IsError_returns_false_for_success_result()
-    {
-        var gen = Generator.GenerateSuccessResult(Gen.Int);
-
-        gen.Sample(result =>
-        {
             result.IsError.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void IsError_returns_true_for_error_result()
+    public void Error_returns_a_result_in_the_error_state()
     {
-        var gen = Generator.GenerateErrorResult<int>();
+        var gen = Generator.Error;
 
-        gen.Sample(result =>
+        gen.Sample(error =>
         {
-            result.IsError.Should().BeTrue();
-        });
-    }
+            // Act
+            var result = Result.Error<int>(error);
 
-    [Fact]
-    public void Map_with_error_returns_original_error()
-    {
-        var gen = from error in Generator.Error
-                  from mapResult in Gen.String
-                  select (error, mapResult);
-
-        gen.Sample(x =>
-        {
-            var (error, mapResult) = x;
-            var errorResult = Result.Error<int>(error);
-            var result = errorResult.Map(_ => mapResult);
-
+            // Assert
             result.Should().BeError().Which.Should().Be(error);
+            result.IsSuccess.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void Map_with_success_applies_function()
+    public void Equality_is_reflexive()
     {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from mapResult in Gen.String
-                  select (successResult, mapResult);
+        var gen = Generator.Result;
 
-        gen.Sample(x =>
+        gen.Sample(monad =>
         {
-            var (successResult, mapResult) = x;
-            var result = successResult.Map(_ => mapResult);
-
-            result.Should().BeSuccess().Which.Should().Be(mapResult);
+            // Assert
+            monad.Equals(monad).Should().BeTrue();
+#pragma warning disable CS1718 // Comparison made to same variable
+            (monad == monad).Should().BeTrue();
+#pragma warning restore CS1718 // Comparison made to same variable
         });
     }
 
     [Fact]
-    public async Task MapTask_with_error_returns_original_error()
+    public void Equality_is_symmetric()
     {
-        var gen = from error in Generator.Error
-                  from mapResult in Gen.String
-                  select (error, mapResult);
+        var gen = from value1 in Gen.Int
+                  from error1 in Generator.Error
+                  from result1 in Gen.OneOfConst(Result.Success(value1),
+                                                 Result.Error<int>(error1))
+                  from value2 in Gen.OneOf(Gen.Const(value1), Gen.Int)
+                  from error2 in Gen.OneOf(Gen.Const(error1), Generator.Error)
+                  from result2 in Gen.OneOfConst(Result.Success(value2),
+                                                 Result.Error<int>(error2))
+                  select (result1, result2);
 
-        await gen.SampleAsync(async x =>
+        gen.Sample(tuple =>
         {
-            var (error, mapResult) = x;
-            var errorResult = Result.Error<int>(error);
-            var result = await errorResult.MapTask(_ => ValueTask.FromResult(mapResult));
+            // Arrange
+            var (result1, result2) = tuple;
 
-            result.Should().BeError().Which.Should().Be(error);
+            // Assert
+            (result1.Equals(result2)).Should().Be(result2.Equals(result1));
+            (result1 == result2).Should().Be(result2 == result1);
         });
     }
 
     [Fact]
-    public async Task MapTask_with_success_applies_function()
+    public void Equality_is_transitive()
     {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from mapResult in Gen.String
-                  select (successResult, mapResult);
+        var gen = from value1 in Gen.Int
+                  from error1 in Generator.Error
+                  from result1 in Gen.OneOfConst(Result.Success(value1),
+                                                 Result.Error<int>(error1))
+                  from value2 in Gen.OneOf(Gen.Const(value1), Gen.Int)
+                  from error2 in Gen.OneOf(Gen.Const(error1), Generator.Error)
+                  from result2 in Gen.OneOfConst(Result.Success(value2),
+                                                 Result.Error<int>(error2))
+                  from value3 in Gen.OneOf(Gen.Const(value1), Gen.Const(value2), Gen.Int)
+                  from error3 in Gen.OneOf(Gen.Const(error1), Gen.Const(error2), Generator.Error)
+                  from result3 in Gen.OneOfConst(Result.Success(value3),
+                                                  Result.Error<int>(error3))
+                  select (result1, result2, result3);
 
-        await gen.SampleAsync(async x =>
+        gen.Sample(tuple =>
         {
-            var (successResult, mapResult) = x;
-            var result = await successResult.MapTask(_ => ValueTask.FromResult(mapResult));
+            // Arrange
+            var (result1, result2, result3) = tuple;
 
-            result.Should().BeSuccess().Which.Should().Be(mapResult);
+            // Assert
+            if (result1.Equals(result2) && result2.Equals(result3))
+            {
+                result1.Equals(result3).Should().BeTrue();
+                (result1 == result3).Should().BeTrue();
+            }
         });
     }
 
     [Fact]
-    public void MapError_with_success_returns_success_value()
+    public void Results_with_the_same_value_are_equal()
     {
         var gen = Gen.Int;
 
-        gen.Sample(successValue =>
+        gen.Sample(value =>
         {
-            var result = Result.Success(successValue);
-            var mapped = result.MapError(_ => Error.From("Some error"));
+            // Arrange
+            var result1 = Result.Success(value);
+            var result2 = Result.Success(value);
 
-            mapped.Should().BeSuccess().Which.Should().Be(successValue);
+            // Assert
+            result1.Equals(result2).Should().BeTrue();
+            (result1 == result2).Should().BeTrue();
+            result1.GetHashCode().Should().Be(result2.GetHashCode());
         });
     }
 
     [Fact]
-    public void MapError_with_error_applies_function()
+    public void Results_with_different_values_are_not_equal()
     {
-        var gen = from errorResult in Generator.GenerateErrorResult<int>()
-                  from newError in Generator.Error
-                  select (errorResult, newError);
+        var gen = from value1 in Gen.Int
+                  from value2 in Gen.Int
+                  where value1 != value2
+                  select (value1, value2);
 
-        gen.Sample(x =>
+        gen.Sample(tuple =>
         {
-            var (errorResult, newError) = x;
-            var result = errorResult.MapError(_ => newError);
+            // Arrange
+            var (value1, value2) = tuple;
+            var result1 = Result.Success(value1);
+            var result2 = Result.Success(value2);
 
-            result.Should().BeError().Which.Should().Be(newError);
+            // Assert
+            result1.Equals(result2).Should().BeFalse();
+            (result1 != result2).Should().BeTrue();
         });
     }
 
     [Fact]
-    public void Bind_with_error_returns_original_error()
+    public void Results_with_the_same_error_are_equal()
     {
-        var gen = from error in Generator.Error
-                  from bindResult in Generator.GenerateResult(Gen.String)
-                  select (error, bindResult);
+        var gen = Generator.Error;
 
-        gen.Sample(x =>
+        gen.Sample(error =>
         {
-            var (error, bindResult) = x;
+            // Arrange
+            var result1 = Result.Error<int>(error);
+            var result2 = Result.Error<int>(error);
+
+            // Assert
+            result1.Equals(result2).Should().BeTrue();
+            (result1 == result2).Should().BeTrue();
+            result1.GetHashCode().Should().Be(result2.GetHashCode());
+        });
+    }
+
+    [Fact]
+    public void Results_with_different_errors_are_not_equal()
+    {
+        var gen = from error1 in Generator.Error
+                  from error2 in Generator.Error
+                  where error1 != error2
+                  select (error1, error2);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (error1, error2) = tuple;
+            var result1 = Result.Error<int>(error1);
+            var result2 = Result.Error<int>(error2);
+
+            // Assert
+            result1.Equals(result2).Should().BeFalse();
+            (result1 != result2).Should().BeTrue();
+        });
+    }
+
+    [Fact]
+    public void Successful_and_error_results_are_not_equal()
+    {
+        var gen = from value in Gen.Int
+                  from error in Generator.Error
+                  select (value, error);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (value, error) = tuple;
+            var successResult = Result.Success(value);
             var errorResult = Result.Error<int>(error);
 
-            var result = errorResult.Bind(_ => bindResult);
+            // Assert
+            successResult.Equals(errorResult).Should().BeFalse();
+            (successResult == errorResult).Should().BeFalse();
+        });
+    }
 
+    [Fact]
+    public void Can_implicitly_convert_value_to_result()
+    {
+        var gen = Gen.Int;
+
+        gen.Sample(value =>
+        {
+            // Act
+            Result<int> result = value;
+
+            // Assert
+            result.Should().BeSuccess().Which.Should().Be(value);
+        });
+    }
+
+    [Fact]
+    public void Can_implicitly_convert_error_to_result()
+    {
+        var gen = Generator.Error;
+
+        gen.Sample(error =>
+        {
+            // Act
+            Result<int> result = error;
+
+            // Assert
             result.Should().BeError().Which.Should().Be(error);
         });
     }
 
     [Fact]
-    public void Bind_with_success_applies_function()
+    public void ToString_contains_value()
     {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from bindResult in Generator.GenerateResult(Gen.String)
-                  select (successResult, bindResult);
+        var gen = Generator.Result;
 
-        gen.Sample(x =>
+        gen.Sample(monad =>
         {
-            var (successResult, bindResult) = x;
+            var toString = monad.ToString();
 
-            var result = successResult.Bind(_ => bindResult);
-
-            result.Should().Be(bindResult);
+            // Assert
+            var expectedSubstring = monad.Match(value => value.ToString(),
+                                                error => error.ToString());
+                                                
+            toString.Should().Contain(expectedSubstring);
         });
     }
 
     [Fact]
-    public async Task BindTask_with_error_returns_original_error()
+    public void Result_satisfies_monad_left_identity()
+    {
+        var gen = from value in Gen.Int
+                  from f in Generator.IntToStringResult
+                  select (value, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (value, f) = tuple;
+            var monad = Result.Success(value);
+
+            // Act
+            var result = monad.Bind(f);
+
+            // Assert
+            result.Should().Be(f(value));
+        });
+    }
+
+    [Fact]
+    public void Result_satisfies_monad_right_identity()
+    {
+        var gen = Generator.Result;
+
+        gen.Sample(monad =>
+        {
+            var result = monad.Bind(Result.Success);
+
+            result.Should().Be(monad);
+        });
+    }
+
+    [Fact]
+    public void Result_satisfies_monad_associativity()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToStringResult
+                  from g in Generator.StringToIntResult
+                  select (monad, f, g);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (monad, f, g) = tuple;
+
+            // Act
+            var path1 = monad.Bind(f)
+                             .Bind(g);
+
+            var path2 = monad.Bind(x => f(x).Bind(g));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public void MapError_satisfies_functor_identity()
+    {
+        var gen = Generator.Result;
+
+        gen.Sample(monad =>
+        {
+            var result = monad.MapError(error => error);
+
+            result.Should().Be(monad);
+        });
+    }
+
+    [Fact]
+    public void MapError_satisfies_functor_composition()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.ErrorToError
+                  from g in Generator.ErrorToError
+                  select (monad, f, g);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (monad, f, g) = tuple;
+
+            // Act
+            var path1 = monad.MapError(f)
+                             .MapError(g);
+
+            var path2 = monad.MapError(error => g(f(error)));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public void LINQ_Select_is_syntactic_sugar_for_map()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToString
+                  select (monad, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (monad, f) = tuple;
+
+            // Act
+            var path1 = from x in monad
+                        select f(x);
+
+            var path2 = monad.Select(f);
+
+            var path3 = monad.Map(f);
+
+            // Assert
+            path1.Should().Be(path2).And.Be(path3);
+        });
+    }
+
+    [Fact]
+    public void LINQ_SelectMany_is_syntactic_sugar_for_bind()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToStringResult
+                  from g1 in Generator.IntToString
+                  from g2 in Generator.StringToInt
+                  let g = (Func<int, string, int>)((int x, string y) => g2(g1(x) + y))
+                  select (monad, f, g);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (monad, f, g) = tuple;
+
+            // Act
+            var path1 = from x in monad
+                        from y in f(x)
+                        select g(x, y);
+
+            var path2 = monad.SelectMany(f, g);
+
+            var path3 = monad.Bind(x => f(x).Map(y => g(x, y)));
+
+            // Assert
+            path1.Should().Be(path2).And.Be(path3);
+        });
+    }
+
+    [Fact]
+    public async Task MapTask_handles_asynchronous_map()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToString
+                  select (monad, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (monad, f) = tuple;
+
+            // Act
+            var path1 = monad.Map(f);
+            var path2 = await monad.MapTask(x => ValueTask.FromResult(f(x)));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_handles_asynchronous_bind()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToStringResult
+                  select (monad, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (monad, f) = tuple;
+
+            // Act
+            var path1 = monad.Bind(f);
+            var path2 = await monad.BindTask(x => ValueTask.FromResult(f(x)));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public async Task BindTask_is_associative()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToStringResultTask
+                  from g in Generator.StringToIntResultTask
+                  select (monad, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (monad, f, g) = tuple;
+
+            // Act
+            var path1 = await (await monad.BindTask(f))
+                                          .BindTask(g);
+
+            var path2 = await monad.BindTask(async x => await (await f(x)).BindTask(g));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public void Match_with_success_returns_success_function()
+    {
+        var gen = from x in Gen.Int
+                  from f in Generator.IntToString
+                  select (x, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (x, f) = tuple;
+            var monad = Result.Success(x);
+
+            var errorFunctionRan = false;
+            string g(Error error)
+            {
+                errorFunctionRan = true;
+                return string.Empty;
+            }
+
+            // Act
+            var result = monad.Match(f, g);
+
+            // Assert
+            result.Should().Be(f(x));
+            errorFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void Match_with_error_returns_error_function()
     {
         var gen = from error in Generator.Error
-                  from bindResult in Generator.GenerateResult(Gen.String)
-                  select (error, bindResult);
+                  from g in Generator.ErrorToInt
+                  select (error, g);
 
-        await gen.SampleAsync(async x =>
+        gen.Sample(tuple =>
         {
-            var (error, bindResult) = x;
-            var errorResult = Result.Error<int>(error);
+            // Arrange
+            var (error, g) = tuple;
+            var monad = Result.Error<int>(error);
 
-            var result = await errorResult.BindTask(_ => ValueTask.FromResult(bindResult));
+            var successFunctionRan = false;
+            int f(int x)
+            {
+                successFunctionRan = true;
+                return 0;
+            }
 
-            result.Should().BeError().Which.Should().Be(error);
+            // Act
+            var result = monad.Match(f, g);
+
+            // Assert
+            result.Should().Be(g(error));
+            successFunctionRan.Should().BeFalse();
         });
     }
 
     [Fact]
-    public async Task BindTask_with_success_applies_function()
+    public void Match_with_success_executes_success_action()
     {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from bindResult in Generator.GenerateResult(Gen.String)
-                  select (successResult, bindResult);
+        var gen = from x in Gen.Int
+                  from f1 in Generator.IntToString
+                  select (x, f1);
 
-        await gen.SampleAsync(async x =>
+        gen.Sample(tuple =>
         {
-            var (successResult, bindResult) = x;
+            // Arrange
+            var (x, f1) = tuple;
 
-            var result = await successResult.BindTask(_ => ValueTask.FromResult(bindResult));
+            var monad = Result.Success(x);
 
-            result.Should().Be(bindResult);
+            var actionedValue = string.Empty;
+            void f(int value) => actionedValue = f1(value);
+
+            bool errorFunctionRan = false;
+            void g(Error error) => errorFunctionRan = true;
+
+            // Act
+            monad.Match(f, g);
+
+            // Assert
+            actionedValue.Should().Be(f1(x));
+            errorFunctionRan.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void Match_with_error_returns_error_function_result()
+    public void Match_with_error_executes_error_action()
     {
-        var gen = from errorResult in Generator.GenerateErrorResult<int>()
-                  from errorFunctionResult in Gen.String
-                  select (errorResult, errorFunctionResult);
+        var gen = from error in Generator.Error
+                  from g1 in Generator.ErrorToError
+                  select (error, g1);
 
-        gen.Sample(x =>
+        gen.Sample(tuple =>
         {
-            var (errorResult, errorFunctionResult) = x;
-            var result = errorResult.Match(_ => string.Empty, _ => errorFunctionResult);
+            // Arrange
+            var (error, g1) = tuple;
 
-            result.Should().Be(errorFunctionResult);
-        });
-    }
+            var monad = Result.Error<int>(error);
 
-    [Fact]
-    public void Match_with_success_returns_success_function_result()
-    {
-        var gen = from successValue in Gen.Int
-                  from successFunctionResult in Gen.String
-                  select (successValue, successFunctionResult);
+            bool successFunctionRan = false;
+            void f(int value) => successFunctionRan = true;
 
-        gen.Sample(x =>
-        {
-            var (successValue, successFunctionResult) = x;
-            var result = Result.Success(successValue);
-            var matched = result.Match(_ => successFunctionResult, _ => string.Empty);
+            Error actionedError = Error.From("Sample error");
+            void g(Error error) => actionedError = g1(error);
 
-            matched.Should().Be(successFunctionResult);
-        });
-    }
+            // Act
+            monad.Match(f, g);
 
-    [Fact]
-    public void Match_with_error_calls_error_action()
-    {
-        var gen = Generator.GenerateErrorResult<int>();
-
-        gen.Sample(errorResult =>
-        {
-            var called = false;
-
-            errorResult.Match(_ => { }, _ => called = true);
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void Match_with_success_calls_success_action()
-    {
-        var gen = Generator.GenerateSuccessResult(Gen.Int);
-
-        gen.Sample(result =>
-        {
-            var called = false;
-
-            result.Match(_ => called = true, _ => { });
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void IfError_with_error_returns_fallback()
-    {
-        var gen = from errorResult in Generator.GenerateErrorResult<int>()
-                  from fallback in Gen.Int
-                  select (errorResult, fallback);
-
-        gen.Sample(x =>
-        {
-            var (errorResult, fallback) = x;
-            var result = errorResult.IfError(_ => fallback);
-
-            result.Should().Be(fallback);
+            // Assert
+            actionedError.Should().Be(g1(error));
+            successFunctionRan.Should().BeFalse();
         });
     }
 
     [Fact]
     public void IfError_with_success_returns_success_value()
     {
-        var gen = Gen.Int;
+        var gen = from value in Gen.Int
+                  from f1 in Generator.ErrorToInt
+                  select (value, f1);
 
-        gen.Sample(successValue =>
+        gen.Sample(tuple =>
         {
-            var result = Result.Success(successValue);
-            var fallback = result.IfError(_ => 0);
+            // Arrange
+            var (value, f1) = tuple;
+            var monad = Result.Success(value);
 
-            fallback.Should().Be(successValue);
-        });
-    }
-
-    [Fact]
-    public void IfError_returning_result_with_error_returns_fallback_result()
-    {
-        var gen = from errorResult in Generator.GenerateErrorResult<int>()
-                  from fallbackResult in Generator.GenerateResult(Gen.Int)
-                  select (errorResult, fallbackResult);
-
-        gen.Sample(x =>
-        {
-            var (errorResult, fallbackResult) = x;
-
-            var result = errorResult.IfError(_ => fallbackResult);
-
-            result.Should().Be(fallbackResult);
-        });
-    }
-
-    [Fact]
-    public void IfError_returning_result_with_success_returns_original_result()
-    {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from fallbackResult in Generator.GenerateResult(Gen.Int)
-                  select (successResult, fallbackResult);
-
-        gen.Sample(x =>
-        {
-            var (successResult, fallbackResult) = x;
-
-            var result = successResult.IfError(_ => fallbackResult);
-
-            result.Should().Be(successResult);
-        });
-    }
-
-    [Fact]
-    public void Iter_with_error_does_not_call_action()
-    {
-        var gen = Generator.GenerateErrorResult<int>();
-
-        gen.Sample(errorResult =>
-        {
-            var called = false;
-
-            errorResult.Iter(_ => called = true);
-
-            called.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Iter_with_success_calls_action()
-    {
-        var gen = Generator.GenerateSuccessResult(Gen.Int);
-
-        gen.Sample(result =>
-        {
-            var called = false;
-
-            result.Iter(_ => called = true);
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public async Task IterTask_with_error_does_not_call_action()
-    {
-        var gen = Generator.GenerateErrorResult<int>();
-
-        await gen.SampleAsync(async errorResult =>
-        {
-            var called = false;
-
-            await errorResult.IterTask(async _ =>
+            var errorFunctionRan = false;
+            int f(Error error)
             {
-                await ValueTask.CompletedTask;
-                called = true;
-            });
-
-            called.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public async Task IterTask_with_success_calls_action()
-    {
-        var gen = Generator.GenerateSuccessResult(Gen.Int);
-
-        await gen.SampleAsync(async result =>
-        {
-            var called = false;
-
-            await result.IterTask(async _ =>
-            {
-                await ValueTask.CompletedTask;
-                called = true;
-            });
-
-            called.Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void IfErrorThrow_with_error_throws_exception()
-    {
-        var gen = Generator.Error;
-
-        gen.Sample(error =>
-        {
-            var errorResult = Result.Error<int>(error);
-            var errorException = error.ToException();
-
-            var action = () => errorResult.IfErrorThrow();
-
-            switch (errorException)
-            {
-                case AggregateException aggregateException:
-                    action.Should().Throw<AggregateException>().And.InnerExceptions.Should().HaveSameCount(aggregateException.InnerExceptions);
-                    break;
-                default:
-                    action.Should().Throw<Exception>().Which.Message.Should().Be(errorException.Message);
-                    break;
+                errorFunctionRan = true;
+                return f1(error);
             }
+
+            // Act
+            var result = monad.IfError(f);
+
+            // Assert
+            result.Should().Be(value);
+            errorFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void IfError_with_error_returns_error_function_value()
+    {
+        var gen = from error in Generator.Error
+                  from f in Generator.ErrorToInt
+                  select (error, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (error, f) = tuple;
+            var monad = Result.Error<int>(error);
+
+            // Act
+            var result = monad.IfError(f);
+
+            // Assert
+            result.Should().Be(f(error));
+        });
+    }
+
+    [Fact]
+    public void IfError_with_success_returns_original_result()
+    {
+        var gen = from value in Gen.String
+                  let monad = Result.Success(value)
+                  from f1 in Generator.ErrorToStringResult
+                  select (monad, f1);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (monad, f1) = tuple;
+
+            var errorFunctionRan = false;
+            Result<string> f(Error error)
+            {
+                errorFunctionRan = true;
+                return f1(error);
+            }
+
+            // Act
+            var result = monad.IfError(f);
+
+            // Assert
+            result.Should().Be(monad);
+            errorFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void IfError_with_error_returns_error_fallback()
+    {
+        var gen = from error in Generator.Error
+                  from f in Generator.ErrorToStringResult
+                  select (error, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (error, f) = tuple;
+            var monad = Result.Error<string>(error);
+
+            // Act
+            var result = monad.IfError(f);
+
+            // Assert
+            result.Should().Be(f(error));
         });
     }
 
@@ -469,27 +692,56 @@ public class ResultTests
     {
         var gen = Gen.Int;
 
-        gen.Sample(successValue =>
+        gen.Sample(value =>
         {
-            var result = Result.Success(successValue);
-            var value = result.IfErrorThrow();
+            // Arrange
+            var monad = Result.Success(value);
 
-            value.Should().Be(successValue);
+            // Act
+            var result = monad.IfErrorThrow();
+
+            // Assert
+            result.Should().Be(value);
         });
     }
 
     [Fact]
-    public void IfErrorNull_with_success_returns_value()
+    public void IfErrorThrow_with_error_throws()
     {
-        var gen = Gen.String.Where(x => x is not null);
+        var gen = Generator.Error;
+
+        gen.Sample(error =>
+        {
+            // Arrange
+            var monad = Result.Error<int>(error);
+
+            // Act
+
+            Action action = () =>
+            {
+                monad.IfErrorThrow();
+            };
+
+            // Assert
+            action.Should().Throw();
+        });
+    }
+
+    [Fact]
+    public void IfErrorNull_with_success_returns_success_value()
+    {
+        var gen = Gen.String;
 
         gen.Sample(value =>
         {
-            var result = Result.Success(value);
+            // Arrange
+            var monad = Result.Success(value);
 
-            var nullableResult = result.IfErrorNull();
+            // Act
+            var result = monad.IfErrorNull();
 
-            nullableResult.Should().Be(value);
+            // Assert
+            result.Should().Be(value).And.NotBeNull();
         });
     }
 
@@ -500,26 +752,32 @@ public class ResultTests
 
         gen.Sample(error =>
         {
-            var result = Result.Error<string>(error);
+            // Arrange
+            var monad = Result.Error<string>(error);
 
-            var nullableResult = result.IfErrorNull();
+            // Act
+            var result = monad.IfErrorNull();
 
-            nullableResult.Should().BeNull();
+            // Assert
+            result.Should().BeNull();
         });
     }
 
     [Fact]
-    public void IfErrorNullable_with_success_returns_value()
+    public void IfErrorNullable_with_success_returns_success_value()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
-            var result = Result.Success(value);
+            // Arrange
+            var monad = Result.Success(value);
 
-            var nullableResult = result.IfErrorNullable();
+            // Act
+            var result = monad.IfErrorNullable();
 
-            nullableResult.Should().Be(value);
+            // Assert
+            result.Should().Be(value).And.NotBeNull();
         });
     }
 
@@ -530,259 +788,106 @@ public class ResultTests
 
         gen.Sample(error =>
         {
-            var result = Result.Error<int>(error);
+            // Arrange
+            var monad = Result.Error<int>(error);
 
-            var nullableResult = result.IfErrorNullable();
+            // Act
+            var result = monad.IfErrorNullable();
 
-            nullableResult.Should().BeNull();
+            // Assert
+            result.Should().BeNull();
         });
     }
 
     [Fact]
-    public void Equals_with_success_and_same_value_returns_true()
+    public void Iter_with_success_executes_action()
     {
         var gen = Gen.Int;
 
         gen.Sample(value =>
         {
-            var result1 = Result.Success(value);
-            var result2 = Result.Success(value);
+            // Arrange
+            var monad = Result.Success(value);
 
-            var equals = result1.Equals(result2);
+            var actionedValue = 0;
+            void action(int x) => actionedValue += x;
 
-            equals.Should().BeTrue();
+            // Act
+            monad.Iter(action);
+
+            // Assert
+            actionedValue.Should().Be(value);
         });
     }
 
     [Fact]
-    public void Equals_with_error_and_same_error_returns_true()
+    public void Iter_with_error_does_not_execute_action()
     {
-        var gen = Gen.String;
+        var gen = Generator.Error;
 
-        gen.Sample(message =>
+        gen.Sample(error =>
         {
-            var error = Error.From(message);
-            var result1 = Result.Error<int>(error);
-            var result2 = Result.Error<int>(error);
+            // Arrange
+            var monad = Result.Error<int>(error);
 
-            var equals = result1.Equals(result2);
+            var actionExecuted = false;
+            void action(int x) => actionExecuted = true;
 
-            equals.Should().BeTrue();
+            // Act
+            monad.Iter(action);
+
+            // Assert
+            actionExecuted.Should().BeFalse();
         });
     }
 
     [Fact]
-    public void Equals_with_success_and_different_values_returns_false()
-    {
-        var gen = from value1 in Gen.Int
-                  from value2 in Gen.Int
-                  where value1 != value2
-                  select (value1, value2);
-
-        gen.Sample(x =>
-        {
-            var (value1, value2) = x;
-            var result1 = Result.Success(value1);
-            var result2 = Result.Success(value2);
-
-            var equals = result1.Equals(result2);
-
-            equals.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Equals_with_error_and_different_errors_returns_false()
-    {
-        var gen = from error1 in Generator.Error
-                  from error2 in Generator.Error
-                  where !error1.Equals(error2)
-                  select (error1, error2);
-
-        gen.Sample(x =>
-        {
-            var (error1, error2) = x;
-            var result1 = Result.Error<int>(error1);
-            var result2 = Result.Error<int>(error2);
-
-            var equals = result1.Equals(result2);
-
-            equals.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Equals_with_success_and_error_returns_false()
-    {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from errorResult in Generator.GenerateErrorResult<int>()
-                  select (successResult, errorResult);
-
-        gen.Sample(x =>
-        {
-            var (successResult, errorResult) = x;
-
-            var equals = successResult.Equals(errorResult);
-
-            equals.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void LINQ_query_syntax_successes_returns_success()
-    {
-        var gen = from result1 in Generator.GenerateSuccessResult(Gen.Int)
-                  from result2 in Generator.GenerateSuccessResult(Gen.Int)
-                  from innerResult in Gen.String
-                  select (result1, result2, innerResult);
-
-        gen.Sample(x =>
-        {
-            var (result1, result2, innerResult) = x;
-
-            var result = from _ in result1
-                         from __ in result2
-                         select innerResult;
-
-            result.Should().BeSuccess().Which.Should().Be(innerResult);
-        });
-    }
-
-    [Fact]
-    public void LINQ_query_syntax_with_error_returns_error()
-    {
-        var gen = from successResult in Generator.GenerateSuccessResult(Gen.Int)
-                  from error in Generator.Error
-                  select (successResult, error);
-
-        gen.Sample(x =>
-        {
-            var (successResult, error) = x;
-            var errorResult = Result.Error<int>(error);
-
-            var result = from _ in successResult
-                         from __ in errorResult
-                         select __;
-
-            result.Should().BeError().Which.Should().Be(error);
-        });
-    }
-
-    [Fact]
-    public void ToString_success_returns_formatted_string()
+    public async Task IterTask_with_success_executes_action()
     {
         var gen = Gen.Int;
 
-        gen.Sample(value =>
+        await gen.SampleAsync(async value =>
         {
-            var result = Result.Success(value);
-            var toString = result.ToString();
+            // Arrange
+            var monad = Result.Success(value);
 
-            toString.Should().Be($"Success: {value}");
+            var actionedValue = 0;
+            async ValueTask action(int x)
+            {
+                await ValueTask.CompletedTask;
+                actionedValue += x;
+            }
+
+            // Act
+            await monad.IterTask(action);
+
+            // Assert
+            actionedValue.Should().Be(value);
         });
     }
 
     [Fact]
-    public void ToString_error_returns_formatted_string()
+    public async Task IterTask_with_error_does_not_execute_action()
     {
-        var gen = Gen.String;
+        var gen = Generator.Error;
 
-        gen.Sample(message =>
+        await gen.SampleAsync(async error =>
         {
-            var error = Error.From(message);
-            var result = Result.Error<int>(error);
-            var toString = result.ToString();
+            // Arrange
+            var monad = Result.Error<int>(error);
 
-            toString.Should().Be($"Error: {error}");
-        });
-    }
+            var actionExecuted = false;
+            async ValueTask action(int x)
+            {
+                await ValueTask.CompletedTask;
+                actionExecuted = true;
+            }
 
-    [Fact]
-    public void GetHashCode_same_success_values_return_same_hash()
-    {
-        var gen = Gen.Int;
+            // Act
+            await monad.IterTask(action);
 
-        gen.Sample(value =>
-        {
-            var result1 = Result.Success(value);
-            var result2 = Result.Success(value);
-
-            var hash1 = result1.GetHashCode();
-            var hash2 = result2.GetHashCode();
-
-            hash1.Should().Be(hash2);
-        });
-    }
-
-    [Fact]
-    public void GetHashCode_same_error_values_return_same_hash()
-    {
-        var gen = Gen.String;
-
-        gen.Sample(message =>
-        {
-            var error = Error.From(message);
-            var result1 = Result.Error<int>(error);
-            var result2 = Result.Error<int>(error);
-
-            var hash1 = result1.GetHashCode();
-            var hash2 = result2.GetHashCode();
-
-            hash1.Should().Be(hash2);
-        });
-    }
-
-    [Fact]
-    public void Implicit_conversion_from_value_creates_success()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            Result<int> result = value;
-
-            result.Should().BeSuccess().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Implicit_conversion_from_error_creates_error()
-    {
-        var gen = Gen.String;
-
-        gen.Sample(message =>
-        {
-            var error = Error.From(message);
-            Result<int> result = error;
-
-            result.Should().BeError().Which.Should().Be(error);
-        });
-    }
-
-    [Fact]
-    public void Static_Success_factory_method_creates_success()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            var result = Result.Success(value);
-
-            result.Should().BeSuccess().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Static_Error_factory_method_creates_error()
-    {
-        var gen = Gen.String;
-
-        gen.Sample(message =>
-        {
-            var error = Error.From(message);
-            var result = Result.Error<int>(error);
-
-            result.Should().BeError().Which.Should().Be(error);
+            // Assert
+            actionExecuted.Should().BeFalse();
         });
     }
 
@@ -793,23 +898,32 @@ public class ResultTests
 
         gen.Sample(value =>
         {
-            var result = Result.Success(value);
-            var option = result.ToOption();
+            // Arrange
+            var monad = Result.Success(value);
 
-            option.Should().BeSome().Which.Should().Be(value);
+            // Act
+            var result = monad.ToOption();
+
+            // Assert
+            result.Should().BeSome().Which.Should().Be(value);
         });
     }
 
     [Fact]
     public void ToOption_with_error_returns_none()
     {
-        var gen = Generator.GenerateErrorResult<int>();
+        var gen = Generator.Error;
 
-        gen.Sample(result =>
+        gen.Sample(error =>
         {
-            var option = result.ToOption();
+            // Arrange
+            var monad = Result.Error<int>(error);
 
-            option.Should().BeNone();
+            // Act
+            var result = monad.ToOption();
+
+            // Assert
+            result.Should().BeNone();
         });
     }
 }

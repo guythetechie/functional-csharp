@@ -367,7 +367,7 @@ public class OptionTests
     public void Where_is_a_monadic_guard()
     {
         var gen = from option in Generator.Option
-                  from predicate in Generator.Predicate
+                  from predicate in Generator.IntPredicate
                   select (option, predicate);
 
         gen.Sample(x =>

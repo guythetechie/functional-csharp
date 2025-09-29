@@ -9,11 +9,59 @@ namespace common.tests;
 
 internal static partial class Generator
 {
-    public static Gen<Error> NonExceptionalError { get; } =
+    public static Gen<Func<int, int>> IntToInt { get; } =
+        Gen.OneOf(// Add x to the integer, ensuring that the output doesn't exceed the bounds of an int
+                  from x in Gen.Int
+                  select (Func<int, int>)(i => (int)Math.Clamp((long)i + x, int.MinValue, int.MaxValue)),
+                  // Multiply the integer by x, ensuring that the output doesn't exceed the bounds of an int
+                  from x in Gen.Int[-10, 10]
+                  select (Func<int, int>)(i => (int)Math.Clamp((long)i * x, int.MinValue, int.MaxValue)));
+
+    public static Gen<Func<int, string>> IntToString { get; } =
+        Gen.OneOf(// Convert the integer to a string in a given base
+                  from @base in Gen.OneOfConst(2, 8, 10, 16)
+                  select (Func<int, string>)(i => Convert.ToString(i, @base)),
+                  // Add a prefix and suffix to the integer when converting to a string
+                  from prefix in Gen.Char.AlphaNumeric.Array[1, 10]
+                  from suffix in Gen.Char.AlphaNumeric.Array[1, 10]
+                  select (Func<int, string>)(i => $"{new string(prefix)}{i}{new string(suffix)}"));
+
+    public static Gen<Func<int, ValueTask<string>>> IntToStringTask { get; } =
+        from f in IntToString
+        select (Func<int, ValueTask<string>>)(i => ValueTask.FromResult(f(i)));
+
+    public static Gen<Func<string, int>> StringToInt { get; } =
+        from f in IntToInt
+        select (Func<string, int>)(s =>
+        {
+            var sum = s.Aggregate(0L, (acc, c) => acc + c);
+            var intSum = (int)Math.Clamp(sum, int.MinValue, int.MaxValue);
+            return f(intSum);
+        });
+
+    public static Gen<Func<string, string>> StringToString { get; } =
+        from f in StringToInt
+        from g in IntToString
+        select (Func<string, string>)(s => g(f(s)));
+
+    public static Gen<Func<int, bool>> IntPredicate { get; } =
+        from x in Gen.Int[3, 10]
+        select (Func<int, bool>)(i => i % x == 0);
+
+    public static Gen<Func<string, bool>> StringPredicate { get; } =
+        from f in IntPredicate
+        select (Func<string, bool>)(s =>
+        {
+            var sum = s.Aggregate(0L, (acc, c) => acc + c);
+            var intSum = (int)Math.Clamp(sum, int.MinValue, int.MaxValue);
+            return f(intSum);
+        });
+
+    private static Gen<Error> NonExceptionalError { get; } =
         from messages in Gen.String.Array
         select common.Error.From(messages);
 
-    public static Gen<Error> ExceptionalError { get; } =
+    private static Gen<Error> ExceptionalError { get; } =
         from message in Gen.String
         let exception = new InvalidOperationException(message)
         select common.Error.From(exception);
@@ -21,9 +69,48 @@ internal static partial class Generator
     public static Gen<Error> Error { get; } =
         Gen.OneOf(NonExceptionalError, ExceptionalError);
 
-    public static Gen<Func<int, bool>> Predicate { get; } =
-        from x in Gen.Int[3, 10]
-        select (Func<int, bool>)(i => i % x == 0);
+    public static Gen<Func<Error, Error>> ErrorToError { get; } =
+        from seed in Error
+        select new Func<Error, Error>(error => error + seed);
+
+    public static Gen<Func<Error, int>> ErrorToInt { get; } =
+        from f in StringToInt
+        select new Func<Error, int>(error => f(error.ToString()));
+
+    public static Gen<Result<int>> Result { get; } =
+        Gen.Int.ToResult();
+
+    public static Gen<Func<int, Result<string>>> IntToStringResult { get; } =
+        from f in IntToString
+        from error in Error
+        select new Func<int, Result<string>>(x => Math.Abs(x % 10) < 9
+                                                    ? common.Result.Success(f(x))
+                                                    : error);
+
+    public static Gen<Func<int, ValueTask<Result<string>>>> IntToStringResultTask { get; } =
+        from f in IntToStringResult
+        select new Func<int, ValueTask<Result<string>>>(x => ValueTask.FromResult(f(x)));
+
+    public static Gen<Func<string, Result<int>>> StringToIntResult { get; } =
+        from f in StringToInt
+        from error in Error
+        select new Func<string, Result<int>>(s =>
+        {
+            var intValue = f(s);
+
+            return Math.Abs(intValue % 10) < 9
+                    ? common.Result.Success(intValue)
+                    : error;
+        });
+
+    public static Gen<Func<string, ValueTask<Result<int>>>> StringToIntResultTask { get; } =
+        from f in StringToIntResult
+        select new Func<string, ValueTask<Result<int>>>(s => ValueTask.FromResult(f(s)));
+
+    public static Gen<Func<Error, Result<string>>> ErrorToStringResult { get; } =
+        from f in ErrorToInt
+        from g in IntToStringResult
+        select new Func<Error, Result<string>>(error => g(f(error)));
 
     public static Gen<Func<int, int>> MapSelector { get; } =
         from x in Gen.Int
@@ -44,38 +131,16 @@ internal static partial class Generator
         from option in MapSelector.ToOption()
         select new Func<int, Option<int>>(x => option.Map(f => f(x)));
 
+    public static Gen<Func<int, ValueTask<Option<int>>>> OptionAsyncSelector { get; } =
+        from f in OptionSelector
+        select new Func<int, ValueTask<Option<int>>>(x => ValueTask.FromResult(f(x)));
+
     public static Gen<Func<int, ValueTask<Option<int>>>> AllSomesAsyncSelector { get; } =
         from f in AllSomesSelector
         select new Func<int, ValueTask<Option<int>>>(x => ValueTask.FromResult(f(x)));
 
     public static Func<int, ValueTask<Option<int>>> AllNonesAsyncSelector { get; } =
         _ => ValueTask.FromResult(Option<int>.None());
-
-    public static Gen<Func<int, ValueTask<Option<int>>>> OptionAsyncSelector { get; } =
-        from option in Option
-        select new Func<int, ValueTask<Option<int>>>(_ => ValueTask.FromResult(option));
-
-    public static Gen<Func<int, Result<int>>> AllSuccessesSelector { get; } =
-        from result in GenerateSuccessResult(Gen.Int)
-        select new Func<int, Result<int>>(_ => result);
-
-    public static Gen<Func<int, ValueTask<Result<int>>>> AllSuccessesAsyncSelector { get; } =
-        from result in GenerateSuccessResult(Gen.Int)
-        select new Func<int, ValueTask<Result<int>>>(_ => ValueTask.FromResult(result));
-
-    public static Func<int, Result<int>> AllErrorsSelector { get; } =
-        _ => Result.Error<int>(common.Error.From("error"));
-
-    public static Func<int, ValueTask<Result<int>>> AllErrorsAsyncSelector { get; } =
-        _ => ValueTask.FromResult(Result.Error<int>(common.Error.From("error")));
-
-    public static Gen<Func<int, Result<int>>> ResultSelector { get; } =
-        from result in GenerateResult(Gen.Int)
-        select new Func<int, Result<int>>(_ => result);
-
-    public static Gen<Func<int, ValueTask<Result<int>>>> ResultAsyncSelector { get; } =
-        from result in GenerateResult(Gen.Int)
-        select new Func<int, ValueTask<Result<int>>>(_ => ValueTask.FromResult(result));
 
     public static Gen<Either<T, T>> GenerateEither<T>(Gen<T> gen) =>
         from t in gen
@@ -95,18 +160,6 @@ internal static partial class Generator
         Gen.OneOf(GenerateLeftEither<TLeft, TRight>(leftGen),
                   GenerateRightEither<TLeft, TRight>(rightGen));
 
-    public static Gen<Result<T>> GenerateErrorResult<T>() =>
-        from error in Error
-        select Result.Error<T>(error);
-
-    public static Gen<Result<T>> GenerateSuccessResult<T>(Gen<T> gen) =>
-        from t in gen
-        select Result.Success(t);
-
-    public static Gen<Result<T>> GenerateResult<T>(Gen<T> gen) =>
-        Gen.Frequency((9, GenerateSuccessResult(gen)),
-                      (1, GenerateErrorResult<T>()));
-
     public static Gen<ImmutableArray<T2>> Traverse<T1, T2>(IEnumerable<T1> source, Func<T1, Gen<T2>> f) =>
         source.Aggregate(Gen.Const(new List<T2>()),
                          (listGen, item) => Gen.Select(listGen, f(item))
@@ -121,4 +174,9 @@ internal static partial class Generator
     public static Gen<Option<T>> ToOption<T>(this Gen<T> gen) =>
         Gen.Frequency((9, gen.Select(common.Option.Some)),
                       (1, Gen.Const(Option<T>.None())));
+
+    public static Gen<Result<T>> ToResult<T>(this Gen<T> gen) =>
+        Gen.Frequency((9, gen.Select(common.Result.Success)),
+                      (1, from error in Error
+                          select common.Result.Error<T>(error)));
 }
