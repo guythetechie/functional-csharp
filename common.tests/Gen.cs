@@ -58,7 +58,8 @@ internal static partial class Generator
         });
 
     private static Gen<Error> NonExceptionalError { get; } =
-        from messages in Gen.String.Array
+        from messages in Gen.String.Where(value => string.IsNullOrWhiteSpace(value) is false).Array
+        where messages.Length > 0
         select common.Error.From(messages);
 
     private static Gen<Error> ExceptionalError { get; } =
@@ -122,6 +123,30 @@ internal static partial class Generator
 
     public static Gen<Option<int>> Option { get; } =
         Gen.Int.ToOption();
+
+    public static Gen<Func<int, Option<string>>> IntToStringOption { get; } =
+        from f in IntToString
+        select new Func<int, Option<string>>(x => Math.Abs(x % 10) < 9
+                                                    ? common.Option.Some(f(x))
+                                                    : common.Option.None);
+
+    public static Gen<Func<int, ValueTask<Option<string>>>> IntToStringOptionTask { get; } =
+        from f in IntToStringOption
+        select new Func<int, ValueTask<Option<string>>>(x => ValueTask.FromResult(f(x)));
+
+    public static Gen<Func<string, Option<int>>> StringToIntOption { get; } =
+        from f in StringToInt
+        select new Func<string, Option<int>>(s =>
+        {
+            var intValue = f(s);
+            return Math.Abs(intValue % 10) < 9
+                    ? common.Option.Some(intValue)
+                    : common.Option.None;
+        });
+
+    public static Gen<Func<string, ValueTask<Option<int>>>> StringToIntOptionTask { get; } =
+        from f in StringToIntOption
+        select new Func<string, ValueTask<Option<int>>>(s => ValueTask.FromResult(f(s)));
 
     public static Gen<Func<int, Option<int>>> AllSomesSelector { get; } =
         from f in MapSelector

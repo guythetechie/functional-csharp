@@ -112,7 +112,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Results_with_the_same_value_are_equal()
+    public void Successes_with_equal_values_are_equal()
     {
         var gen = Gen.Int;
 
@@ -130,7 +130,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Results_with_different_values_are_not_equal()
+    public void Successes_with_different_values_are_not_equal()
     {
         var gen = from value1 in Gen.Int
                   from value2 in Gen.Int
@@ -151,7 +151,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Results_with_the_same_error_are_equal()
+    public void Errors_with_the_same_value_are_equal()
     {
         var gen = Generator.Error;
 
@@ -169,7 +169,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Results_with_different_errors_are_not_equal()
+    public void Errors_with_different_values_are_not_equal()
     {
         var gen = from error1 in Generator.Error
                   from error2 in Generator.Error
@@ -190,7 +190,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void Successful_and_error_results_are_not_equal()
+    public void Successes_never_equal_errors()
     {
         var gen = from value in Gen.Int
                   from error in Generator.Error
@@ -251,29 +251,145 @@ public class ResultTests
             // Assert
             var expectedSubstring = monad.Match(value => value.ToString(),
                                                 error => error.ToString());
-                                                
+
             toString.Should().Contain(expectedSubstring);
+        });
+    }
+
+    [Fact]
+    public void Match_with_success_returns_success_function()
+    {
+        var gen = from x in Gen.Int
+                  from f in Generator.IntToString
+                  select (x, f);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (x, f) = tuple;
+            var monad = Result.Success(x);
+
+            var errorFunctionRan = false;
+            string g(Error error)
+            {
+                errorFunctionRan = true;
+                return string.Empty;
+            }
+
+            // Act
+            var result = monad.Match(f, g);
+
+            // Assert
+            result.Should().Be(f(x));
+            errorFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void Match_with_error_returns_error_function()
+    {
+        var gen = from error in Generator.Error
+                  from g in Generator.ErrorToInt
+                  select (error, g);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (error, g) = tuple;
+            var monad = Result.Error<int>(error);
+
+            var successFunctionRan = false;
+            int f(int x)
+            {
+                successFunctionRan = true;
+                return 0;
+            }
+
+            // Act
+            var result = monad.Match(f, g);
+
+            // Assert
+            result.Should().Be(g(error));
+            successFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void Match_with_success_executes_success_action()
+    {
+        var gen = from x in Gen.Int
+                  from f1 in Generator.IntToString
+                  select (x, f1);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (x, f1) = tuple;
+
+            var monad = Result.Success(x);
+
+            var actionedValue = string.Empty;
+            void f(int value) => actionedValue += f1(value);
+
+            bool errorFunctionRan = false;
+            void g(Error error) => errorFunctionRan = true;
+
+            // Act
+            monad.Match(f, g);
+
+            // Assert
+            actionedValue.Should().Be(f1(x));
+            errorFunctionRan.Should().BeFalse();
+        });
+    }
+
+    [Fact]
+    public void Match_with_error_executes_error_action()
+    {
+        var gen = from error in Generator.Error
+                  from g1 in Generator.ErrorToError
+                  select (error, g1);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (error, g1) = tuple;
+
+            var monad = Result.Error<int>(error);
+
+            bool successFunctionRan = false;
+            void f(int value) => successFunctionRan = true;
+
+            Error actionedError = Error.From("Sample error");
+            void g(Error error) => actionedError = g1(error);
+
+            // Act
+            monad.Match(f, g);
+
+            // Assert
+            actionedError.Should().Be(g1(error));
+            successFunctionRan.Should().BeFalse();
         });
     }
 
     [Fact]
     public void Result_satisfies_monad_left_identity()
     {
-        var gen = from value in Gen.Int
+        var gen = from x in Gen.Int
                   from f in Generator.IntToStringResult
-                  select (value, f);
+                  select (x, f);
 
         gen.Sample(tuple =>
         {
             // Arrange
-            var (value, f) = tuple;
-            var monad = Result.Success(value);
+            var (x, f) = tuple;
+            var monad = Result.Success(x);
 
             // Act
             var result = monad.Bind(f);
 
             // Assert
-            result.Should().Be(f(value));
+            result.Should().Be(f(x));
         });
     }
 
@@ -315,36 +431,65 @@ public class ResultTests
     }
 
     [Fact]
-    public void MapError_satisfies_functor_identity()
+    public void Map_is_equivalent_to_bind_then_return()
+    {
+        var gen = from monad in Generator.Result
+                  from f in Generator.IntToString
+                  select (monad, f);
+
+        gen.Sample(x =>
+        {
+            // Arrange
+            var (monad, f) = x;
+
+            // Act
+            var path1 = monad.Map(f);
+            var path2 = monad.Bind(x => Result.Success(f(x)));
+
+            // Assert
+            path1.Should().Be(path2);
+        });
+    }
+
+    [Fact]
+    public void Result_satisfies_bifunctor_identity()
     {
         var gen = Generator.Result;
 
         gen.Sample(monad =>
         {
-            var result = monad.MapError(error => error);
+            // Act
+            var result = monad.Map(value => value)
+                              .MapError(error => error);
 
+            // Assert
             result.Should().Be(monad);
         });
     }
 
     [Fact]
-    public void MapError_satisfies_functor_composition()
+    public void Result_satisfies_bifunctor_composition()
     {
         var gen = from monad in Generator.Result
-                  from f in Generator.ErrorToError
-                  from g in Generator.ErrorToError
-                  select (monad, f, g);
+                  from f in Generator.IntToString
+                  from g in Generator.StringToInt
+                  from h in Generator.ErrorToError
+                  from i in Generator.ErrorToError
+                  select (monad, f, g, h, i);
 
         gen.Sample(tuple =>
         {
             // Arrange
-            var (monad, f, g) = tuple;
+            var (monad, f, g, h, i) = tuple;
 
             // Act
-            var path1 = monad.MapError(f)
-                             .MapError(g);
+            var path1 = monad.Map(f)
+                             .MapError(h)
+                             .Map(g)
+                             .MapError(i);
 
-            var path2 = monad.MapError(error => g(f(error)));
+            var path2 = monad.Map(x => g(f(x)))
+                             .MapError(error => i(h(error)));
 
             // Assert
             path1.Should().Be(path2);
@@ -472,122 +617,6 @@ public class ResultTests
     }
 
     [Fact]
-    public void Match_with_success_returns_success_function()
-    {
-        var gen = from x in Gen.Int
-                  from f in Generator.IntToString
-                  select (x, f);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (x, f) = tuple;
-            var monad = Result.Success(x);
-
-            var errorFunctionRan = false;
-            string g(Error error)
-            {
-                errorFunctionRan = true;
-                return string.Empty;
-            }
-
-            // Act
-            var result = monad.Match(f, g);
-
-            // Assert
-            result.Should().Be(f(x));
-            errorFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_error_returns_error_function()
-    {
-        var gen = from error in Generator.Error
-                  from g in Generator.ErrorToInt
-                  select (error, g);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (error, g) = tuple;
-            var monad = Result.Error<int>(error);
-
-            var successFunctionRan = false;
-            int f(int x)
-            {
-                successFunctionRan = true;
-                return 0;
-            }
-
-            // Act
-            var result = monad.Match(f, g);
-
-            // Assert
-            result.Should().Be(g(error));
-            successFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_success_executes_success_action()
-    {
-        var gen = from x in Gen.Int
-                  from f1 in Generator.IntToString
-                  select (x, f1);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (x, f1) = tuple;
-
-            var monad = Result.Success(x);
-
-            var actionedValue = string.Empty;
-            void f(int value) => actionedValue = f1(value);
-
-            bool errorFunctionRan = false;
-            void g(Error error) => errorFunctionRan = true;
-
-            // Act
-            monad.Match(f, g);
-
-            // Assert
-            actionedValue.Should().Be(f1(x));
-            errorFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_error_executes_error_action()
-    {
-        var gen = from error in Generator.Error
-                  from g1 in Generator.ErrorToError
-                  select (error, g1);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (error, g1) = tuple;
-
-            var monad = Result.Error<int>(error);
-
-            bool successFunctionRan = false;
-            void f(int value) => successFunctionRan = true;
-
-            Error actionedError = Error.From("Sample error");
-            void g(Error error) => actionedError = g1(error);
-
-            // Act
-            monad.Match(f, g);
-
-            // Assert
-            actionedError.Should().Be(g1(error));
-            successFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
     public void IfError_with_success_returns_success_value()
     {
         var gen = from value in Gen.Int
@@ -638,7 +667,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void IfError_with_success_returns_original_result()
+    public void IfError_with_success_ignores_fallback()
     {
         var gen = from value in Gen.String
                   let monad = Result.Success(value)
@@ -667,7 +696,7 @@ public class ResultTests
     }
 
     [Fact]
-    public void IfError_with_error_returns_error_fallback()
+    public void IfError_with_error_returns_fallback()
     {
         var gen = from error in Generator.Error
                   from f in Generator.ErrorToStringResult
@@ -810,10 +839,10 @@ public class ResultTests
             var monad = Result.Success(value);
 
             var actionedValue = 0;
-            void action(int x) => actionedValue += x;
+            void f(int x) => actionedValue += x;
 
             // Act
-            monad.Iter(action);
+            monad.Iter(f);
 
             // Assert
             actionedValue.Should().Be(value);
@@ -831,10 +860,10 @@ public class ResultTests
             var monad = Result.Error<int>(error);
 
             var actionExecuted = false;
-            void action(int x) => actionExecuted = true;
+            void f(int x) => actionExecuted = true;
 
             // Act
-            monad.Iter(action);
+            monad.Iter(f);
 
             // Assert
             actionExecuted.Should().BeFalse();
@@ -852,14 +881,14 @@ public class ResultTests
             var monad = Result.Success(value);
 
             var actionedValue = 0;
-            async ValueTask action(int x)
+            async ValueTask f(int x)
             {
                 await ValueTask.CompletedTask;
                 actionedValue += x;
             }
 
             // Act
-            await monad.IterTask(action);
+            await monad.IterTask(f);
 
             // Assert
             actionedValue.Should().Be(value);
@@ -876,18 +905,18 @@ public class ResultTests
             // Arrange
             var monad = Result.Error<int>(error);
 
-            var actionExecuted = false;
-            async ValueTask action(int x)
+            var actionedValue = 0;
+            async ValueTask f(int x)
             {
                 await ValueTask.CompletedTask;
-                actionExecuted = true;
+                actionedValue += x;
             }
 
             // Act
-            await monad.IterTask(action);
+            await monad.IterTask(f);
 
             // Assert
-            actionExecuted.Should().BeFalse();
+            actionedValue.Should().Be(0);
         });
     }
 

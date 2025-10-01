@@ -2,6 +2,7 @@ using common;
 using CsCheck;
 using FluentAssertions;
 using System;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Threading;
@@ -91,199 +92,107 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
-    public void Choose_result_length_never_exceeds_source()
-    {
-        var gen = from array in Gen.Int.Array
-                  from selector in Generator.OptionSelector
-                  select (array, selector);
-
-        gen.Sample(x =>
-        {
-            var (array, selector) = x;
-
-            var result = array.Choose(selector);
-
-            result.Should().HaveCountLessThanOrEqualTo(array.Length);
-        });
-    }
-
-    [Fact]
-    public void Choose_maintains_order_of_elements()
+    public void Choose_satisfies_monad_left_identity()
     {
         var gen = Gen.Int.Array;
 
         gen.Sample(array =>
         {
-            Option<(int, int Index)> selector((int item, int index) pair)
-            {
-                var gen = from option in Generator.Option
-                          select from x in option
-                                 select (x, pair.index);
+            var result = array.Choose(Option.Some);
 
-                return gen.Single();
-            }
-
-            var result = array.Select((item, index) => (item, index))
-                              .Choose(selector);
-
-            result.Select(x => x.Index).Should().BeInAscendingOrder();
+            result.Should().Equal(array);
         });
     }
 
     [Fact]
-    public void Choose_with_all_somes_has_same_count_as_original()
+    public void Choose_satisfies_monad_right_identity()
     {
         var gen = from array in Gen.Int.Array
-                  from selector in Generator.AllSomesSelector
-                  select (array, selector);
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        gen.Sample(x =>
+        gen.Sample(tuple =>
         {
-            var (array, selector) = x;
+            // Arrange
+            var (array, f) = tuple;
 
-            var result = array.Choose(selector);
+            // Act
+            var path1 = array.Choose(f);
 
-            result.Should().HaveSameCount(array);
-        });
-    }
-
-    [Fact]
-    public void Choose_with_all_nones_returns_an_empty_sequence()
-    {
-        var gen = Gen.Int.Array;
-
-        gen.Sample(array =>
-        {
-            var result = array.Choose(Selectors.AllNones);
-
-            result.Should().BeEmpty();
-        });
-    }
-
-    [Fact]
-    public async Task Choose_with_async_selector_result_length_never_exceeds_source()
-    {
-        var gen = from array in Gen.Int.Array
-                  from selector in Generator.OptionAsyncSelector
-                  select (array, selector);
-
-        await gen.SampleAsync(async x =>
-        {
-            var (array, selector) = x;
-
-            var result = array.Choose(selector);
+            var path2 = array.Choose(f)
+                             .Choose(Option.Some);
 
             // Assert
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            resultArray.Should().HaveCountLessThanOrEqualTo(array.Length);
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public async Task Choose_with_async_selector_maintains_order_of_elements()
-    {
-        var gen = Gen.Int.Array;
-
-        await gen.SampleAsync(async array =>
-        {
-            ValueTask<Option<(int, int Index)>> selector((int item, int index) pair)
-            {
-                var gen = from option in Generator.Option
-                          select from x in option
-                                 select (x, pair.index);
-
-                return ValueTask.FromResult(gen.Single());
-            }
-
-            var result = array.Select((item, index) => (item, index))
-                              .Choose(selector);
-
-            // Assert
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            resultArray.Select(x => x.Index).Should().BeInAscendingOrder();
-        });
-    }
-
-    [Fact]
-    public async Task Choose_with_async_selector_all_somes_has_same_count_as_original()
+    public void Choose_satisfies_monad_associativity()
     {
         var gen = from array in Gen.Int.Array
-                  from selector in Generator.AllSomesAsyncSelector
-                  select (array, selector);
+                  from f in Generator.IntToStringOption
+                  from g in Generator.StringToIntOption
+                  select (array, f, g);
 
-        await gen.SampleAsync(async x =>
+        gen.Sample(tuple =>
         {
-            var (array, selector) = x;
+            // Arrange
+            var (array, f, g) = tuple;
 
-            var result = array.Choose(selector);
+            // Act
+            var path1 = array.Choose(f)
+                             .Choose(g);
+
+            var path2 = array.Choose(x => f(x).Bind(g));
 
             // Assert
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            resultArray.Should().HaveSameCount(array);
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public async Task Choose_with_async_selector_all_nones_returns_an_empty_sequence()
+    public async Task Choose_with_async_selector_handles_asynchronous_choose()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
-            var selector = Generator.AllNonesAsyncSelector;
+            // Arrange
+            var (array, f) = tuple;
 
-            var result = array.Choose(selector);
+            // Act
+            var path1 = array.Choose(f);
+
+            var path2 = await array.Choose(x => ValueTask.FromResult(f(x)))
+                                   .ToArrayAsync(CancellationToken);
 
             // Assert
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            resultArray.Should().BeEmpty();
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public void Pick_with_empty_enumerable_returns_none()
-    {
-        var gen = Generator.OptionSelector;
-
-        gen.Sample(selector =>
-        {
-            var source = Enumerable.Empty<int>();
-
-            var result = source.Pick(selector);
-
-            result.Should().BeNone();
-        });
-    }
-
-    [Fact]
-    public void Pick_with_all_nones_returns_none()
+    public void Pick_returns_first_some_or_none()
     {
         var gen = from array in Gen.Int.Array
-                  select array;
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
-            var result = array.Pick(Selectors.AllNones);
+            // Arrange
+            var (array, f) = tuple;
 
-            result.Should().BeNone();
-        });
-    }
+            // Act
+            var result = array.Pick(f);
 
-    [Fact]
-    public void Pick_with_all_somes_returns_some()
-    {
-        var gen = from array in Gen.Int.Array
-                  where array.Length > 0
-                  from selector in Generator.AllSomesSelector
-                  select (array, selector);
-
-        gen.Sample(x =>
-        {
-            var (array, selector) = x;
-
-            var result = array.Pick(selector);
-
-            result.Should().BeSome();
+            // Assert
+            var filteredArray = array.Select(f).Where(x => x.IsSome);
+            result.Match(some => filteredArray.First().Should().BeSome().Which.Should().Be(some),
+                         () => filteredArray.Should().BeEmpty());
         });
     }
 
@@ -308,17 +217,19 @@ public class EnumerableExtensionsTests
     [Fact]
     public void Traverse_with_result_passes_naturality_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringResult
+                  select (array, f);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
-            var selector = Selectors.MixedResult;
+            var (array, f) = tuple;
 
             // Act
-            var path1 = array.Traverse(selector, CancellationToken)
+            var path1 = array.Traverse(f, CancellationToken)
                              .ToOption();
 
-            var path2 = array.Traverse(x => selector(x).ToOption(), CancellationToken);
+            var path2 = array.Traverse(x => f(x).ToOption(), CancellationToken);
 
             // Assert
             path1.Match(path1Array => path2.Should().BeSome().Which.Should().Equal(path1Array),
@@ -329,20 +240,22 @@ public class EnumerableExtensionsTests
     [Fact]
     public void Traverse_with_result_passes_composition_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringResult
+                  from g in Generator.StringToIntOption
+                  select (array, f, g);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
             // Arrange
-            var resultSelector = Selectors.MixedResult;
-            var optionSelector = Selectors.MixedOption;
+            var (array, f, g) = tuple;
 
             // Act
-            var path1 = array.Traverse(x => resultSelector(x).Map(optionSelector), CancellationToken)
+            var path1 = array.Traverse(x => f(x).Map(g), CancellationToken)
                              .Map(optionArray => optionArray.Traverse(x => x, CancellationToken));
 
-            var path2 = array.Traverse(resultSelector, CancellationToken)
-                             .Map(array => array.Traverse(optionSelector, CancellationToken));
+            var path2 = array.Traverse(f, CancellationToken)
+                             .Map(array => array.Traverse(g, CancellationToken));
 
             // Assert
             path1.Match(path1Option => path1Option.Match(path1Array => path2.Should().BeSuccess().Which.Should().BeSome().Which.Should().Equal(path1Array),
@@ -367,18 +280,20 @@ public class EnumerableExtensionsTests
     [Fact]
     public void Traverse_with_option_passes_naturality_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
             // Arrange
-            var selector = Selectors.MixedOption;
+            var (array, f) = tuple;
 
             // Act
-            var path1 = array.Traverse(selector, CancellationToken)
+            var path1 = array.Traverse(f, CancellationToken)
                              .ToResult(() => Error.From("test error"));
 
-            var path2 = array.Traverse(x => selector(x).ToResult(() => Error.From("test error")), CancellationToken);
+            var path2 = array.Traverse(x => f(x).ToResult(() => Error.From("test error")), CancellationToken);
 
             // Assert
             path1.Match(path1Array => path2.Should().BeSuccess().Which.Should().Equal(path1Array),
@@ -389,20 +304,22 @@ public class EnumerableExtensionsTests
     [Fact]
     public void Traverse_with_option_passes_composition_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringOption
+                  from g in Generator.StringToIntResult
+                  select (array, f, g);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
             // Arrange
-            var optionSelector = Selectors.MixedOption;
-            var resultSelector = Selectors.MixedResult;
+            var (array, f, g) = tuple;
 
             // Act
-            var path1 = array.Traverse(x => optionSelector(x).Map(resultSelector), CancellationToken)
+            var path1 = array.Traverse(x => f(x).Map(g), CancellationToken)
                              .Map(resultArray => resultArray.Traverse(x => x, CancellationToken));
 
-            var path2 = array.Traverse(optionSelector, CancellationToken)
-                             .Map(array => array.Traverse(resultSelector, CancellationToken));
+            var path2 = array.Traverse(f, CancellationToken)
+                             .Map(array => array.Traverse(g, CancellationToken));
 
             // Assert
             path1.Match(path1Result => path1Result.Match(path1Array => path2.Should().BeSome().Which.Should().BeSuccess().Which.Should().Equal(path1Array),
@@ -607,24 +524,54 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
-    public void Tap_executes_side_effect_and_preserves_original_enumerable()
+    public void Tap_satisfies_identity_law()
     {
         var gen = Gen.Int.Array;
 
         gen.Sample(array =>
         {
-            var tapCount = 0;
+            // Act
+            var result = array.Tap(_ => { });
 
-            var result = array.Tap(_ => tapCount++)
-                              .ToArray();
-
-            result.Should().BeEquivalentTo(array);
-            tapCount.Should().Be(array.Length);
+            // Assert
+            result.Should().Equal(array);
         });
     }
 
     [Fact]
-    public void Tap_is_lazily_evaluated()
+    public void Tap_satisfies_composition_law()
+    {
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToString
+                  from g in Generator.IntToString
+                  select (array, f, g);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (array, f, g) = tuple;
+            var path1Sum = string.Empty;
+            var path2Sum = string.Empty;
+
+            // Act
+            var path1Array = array.Tap(x => path1Sum += f(x))
+                                  .Tap(x => path1Sum += g(x));
+
+            var path2Array = array.Tap(x =>
+                                    {
+                                        path2Sum += f(x);
+                                        path2Sum += g(x);
+                                    })
+                                  .ToArray();
+
+            // Assert
+            path1Array.Should().Equal(path2Array);
+            path1Sum.Should().Be(path2Sum);
+        });
+    }
+
+    [Fact]
+    public void Tap_is_lazy()
     {
         var gen = Gen.Int.Array.Where(arr => arr.Length > 0);
 
@@ -647,22 +594,42 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
-    public void Tap_can_be_chained_multiple_times()
+    public void Unzip_reverses_zip()
     {
-        var gen = Gen.Int.Array;
+        var gen = from first in Gen.Int.Array
+                  from second in Gen.String.Array[first.Length]
+                  select (first, second);
 
-        gen.Sample(array =>
+        gen.Sample(tuple =>
         {
-            var firstTapCount = 0;
-            var secondTapCount = 0;
+            // Arrange
+            var (first, second) = tuple;
+            var zipped = first.Zip(second);
 
-            var result = array.Tap(_ => firstTapCount++)
-                              .Tap(_ => secondTapCount++)
-                              .ToArray();
+            // Act
+            var (unzipped1, unzipped2) = zipped.Unzip();
 
-            result.Should().BeEquivalentTo(array);
-            firstTapCount.Should().Be(array.Length);
-            secondTapCount.Should().Be(array.Length);
+            // Assert
+            unzipped1.Should().Equal(first);
+            unzipped2.Should().Equal(second);
+        });
+    }
+
+    [Fact]
+    public void Zip_reverses_unzip()
+    {
+        var gen = from first in Gen.Int.Array
+                  from second in Gen.String.Array[first.Length]
+                  select first.Zip(second);
+
+        gen.Sample(pairs =>
+        {
+            // Act
+            var (first, second) = pairs.Unzip();
+            var rezipped = first.Zip(second);
+
+            // Assert
+            rezipped.Should().Equal(pairs);
         });
     }
 
@@ -719,129 +686,130 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task Choose_result_length_never_exceeds_source()
+    public async Task Head_works_with_infinite_sequences()
     {
-        var gen = from array in Gen.Int.Array
-                  from selector in Generator.OptionSelector
-                  select (array.ToAsyncEnumerable(), selector);
+        var enumerable = Enumerable.Range(1, int.MaxValue)
+                                   .ToAsyncEnumerable();
 
-        await gen.SampleAsync(async x =>
+        var result = await enumerable.Head(CancellationToken);
+
+        result.Should().BeSome();
+    }
+
+    [Fact]
+    public async Task Choose_satisfies_monad_left_identity()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
         {
-            var (source, selector) = x;
+            var source = array.ToAsyncEnumerable();
 
-            var result = source.Choose(selector);
+            var result = await source.Choose(Option.Some)
+                                     .ToArrayAsync(CancellationToken);
 
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            var sourceLength = await source.CountAsync(CancellationToken);
-            resultArray.Should().HaveCountLessThanOrEqualTo(sourceLength);
+            result.Should().Equal(array);
         });
     }
 
     [Fact]
-    public async Task Choose_maintains_order_of_elements()
+    public async Task Choose_satisfies_monad_right_identity()
     {
         var gen = from array in Gen.Int.Array
-                  select array.ToAsyncEnumerable();
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        await gen.SampleAsync(async source =>
+        await gen.SampleAsync(async tuple =>
         {
-            Option<(string, int Index)> selector((int item, int index) pair)
-            {
-                var gen = from option in Gen.String.ToOption()
-                          select from x in option
-                                 select (x, pair.index);
+            // Arrange
+            var (array, f) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-                return gen.Single();
-            }
+            // Act
+            var path1 = await source.Choose(f)
+                                    .ToArrayAsync(CancellationToken);
 
-            var result = source.Select((item, index) => (item, index))
-                                .Choose(selector);
+            var path2 = await source.Choose(f)
+                                    .Choose(Option.Some)
+                                    .ToArrayAsync(CancellationToken);
 
-            var resultIndexes = await result.Select(x => x.Index)
-                                            .ToArrayAsync(CancellationToken);
-
-            resultIndexes.Should().BeInAscendingOrder();
+            // Assert
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public async Task Choose_with_all_somes_has_same_count_as_original()
+    public async Task Choose_satisfies_monad_associativity()
     {
         var gen = from array in Gen.Int.Array
-                  from selector in Generator.AllSomesSelector
-                  select (array.ToAsyncEnumerable(), selector);
+                  from f in Generator.IntToStringOption
+                  from g in Generator.StringToIntOption
+                  select (array, f, g);
 
-        await gen.SampleAsync(async x =>
+        await gen.SampleAsync(async tuple =>
         {
-            var (source, selector) = x;
+            // Arrange
+            var (array, f, g) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-            var result = source.Choose(selector);
+            // Act
+            var path1 = await source.Choose(f)
+                                    .Choose(g)
+                                    .ToArrayAsync(CancellationToken);
 
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            var sourceArray = await source.ToArrayAsync(CancellationToken);
-            resultArray.Should().HaveSameCount(sourceArray);
+            var path2 = await source.Choose(x => f(x).Bind(g))
+                                    .ToArrayAsync(CancellationToken);
+
+            // Assert
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public async Task Choose_with_all_nones_returns_an_empty_sequence()
+    public async Task Choose_with_async_selector_handles_asynchronous_choose()
     {
         var gen = from array in Gen.Int.Array
-                  select array.ToAsyncEnumerable();
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        await gen.SampleAsync(async source =>
+        await gen.SampleAsync(async tuple =>
         {
-            var result = source.Choose(Selectors.AllNones);
+            // Arrange
+            var (array, f) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-            var resultArray = await result.ToArrayAsync(CancellationToken);
-            resultArray.Should().BeEmpty();
+            // Act
+            var path1 = await source.Choose(f)
+                                    .ToArrayAsync(CancellationToken);
+
+            var path2 = await array.Choose(x => ValueTask.FromResult(f(x)))
+                                   .ToArrayAsync(CancellationToken);
+
+            // Assert
+            path1.Should().Equal(path2);
         });
     }
 
     [Fact]
-    public async Task Pick_with_empty_enumerable_returns_none()
-    {
-        var gen = Generator.OptionSelector;
-
-        await gen.SampleAsync(async selector =>
-        {
-            var source = AsyncEnumerable.Empty<int>();
-
-            var result = await source.Pick(selector, CancellationToken);
-
-            result.Should().BeNone();
-        });
-    }
-
-    [Fact]
-    public async Task Pick_with_all_nones_returns_none()
+    public async Task Pick_returns_first_some_or_none()
     {
         var gen = from array in Gen.Int.Array
-                  select array.ToAsyncEnumerable();
+                  from f in Generator.IntToStringOption
+                  select (array, f);
 
-        await gen.SampleAsync(async source =>
+        await gen.SampleAsync(async tuple =>
         {
-            var result = await source.Pick(Selectors.AllNones, CancellationToken);
+            // Arrange
+            var (array, f) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-            result.Should().BeNone();
-        });
-    }
+            // Act
+            var result = await source.Pick(f, CancellationToken);
 
-    [Fact]
-    public async Task Pick_with_all_somes_returns_some()
-    {
-        var gen = from array in Gen.Int.Array
-                  where array.Length > 0
-                  from selector in Generator.AllSomesSelector
-                  select (array.ToAsyncEnumerable(), selector);
-
-        await gen.SampleAsync(async x =>
-        {
-            var (source, selector) = x;
-
-            var result = await source.Pick(selector, CancellationToken);
-
-            result.Should().BeSome();
+            // Assert
+            var filteredArray = array.Select(f).Where(x => x.IsSome);
+            result.Match(some => filteredArray.First().Should().BeSome().Which.Should().Be(some),
+                         () => filteredArray.Should().BeEmpty());
         });
     }
 
@@ -852,11 +820,18 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
+            // Arrange
             var asyncEnumerable = array.ToAsyncEnumerable();
-            var f = (int x) => ValueTask.FromResult(Result.Success(x));
+            async ValueTask<Result<int>> f(int x)
+            {
+                await ValueTask.CompletedTask;
+                return Result.Success(x);
+            }
 
+            // Act
             var result = await asyncEnumerable.Traverse(f, CancellationToken);
 
+            // Assert
             result.Should().BeSuccess().Which.Should().BeEquivalentTo(array);
         });
     }
@@ -868,10 +843,18 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
+            // Arrange
             var source = array.ToAsyncEnumerable();
+            async ValueTask<Result<int>> f(int x)
+            {
+                await ValueTask.CompletedTask;
+                return Result.Success(x);
+            }
 
-            var result = await source.Traverse(Selectors.ResultIdentityAsync, CancellationToken);
+            // Act
+            var result = await source.Traverse(f, CancellationToken);
 
+            // Assert
             result.Should().BeSuccess().Which.Should().Equal(array);
         });
     }
@@ -879,17 +862,22 @@ public class AsyncEnumerableExtensionsTests
     [Fact]
     public async Task Traverse_with_result_passes_naturality_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringResultTask
+                  select (array, f);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
+            // Arrange
+            var (array, f) = tuple;
             var source = array.ToAsyncEnumerable();
-            var selector = Selectors.MixedResultAsync;
 
-            var path1 = (await source.Traverse(selector, CancellationToken)).ToOption();
+            // Act
+            var path1 = (await source.Traverse(f, CancellationToken)).ToOption();
 
-            var path2 = await source.Traverse(async x => (await selector(x)).ToOption(), CancellationToken);
+            var path2 = await source.Traverse(async x => (await f(x)).ToOption(), CancellationToken);
 
+            // Assert
             path1.Match(path1Array => path2.Should().BeSome().Which.Should().Equal(path1Array),
                         () => path2.Should().BeNone());
         });
@@ -898,26 +886,31 @@ public class AsyncEnumerableExtensionsTests
     [Fact]
     public async Task Traverse_with_result_passes_composition_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringResultTask
+                  from g in Generator.StringToIntOptionTask
+                  select (array, f, g);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
+            // Arrange
+            var (array, f, g) = tuple;
             var source = array.ToAsyncEnumerable();
-            var resultSelector = Selectors.MixedResultAsync;
-            var optionSelector = Selectors.MixedOptionAsync;
 
+            // Act
             var path1FirstPass = await source.Traverse(async x =>
                                     {
-                                        var result = await resultSelector(x);
-                                        return await result.MapTask(optionSelector);
+                                        var result = await f(x);
+                                        return await result.MapTask(g);
                                     }, CancellationToken);
 
             var path1 = await path1FirstPass.MapTask(optionArray => ValueTask.FromResult(optionArray.Traverse(x => x, CancellationToken)));
 
-            var path2FirstPass = await source.Traverse(resultSelector, CancellationToken);
+            var path2FirstPass = await source.Traverse(f, CancellationToken);
             var path2 = await path2FirstPass.MapTask(values => values.ToAsyncEnumerable()
-                                                                     .Traverse(optionSelector, CancellationToken));
+                                                                     .Traverse(g, CancellationToken));
 
+            // Assert
             path1.Match(path1Option => path1Option.Match(path1Array => path2.Should().BeSuccess().Which.Should().BeSome().Which.Should().Equal(path1Array),
                                                          () => path2.Should().BeSuccess().Which.Should().BeNone()),
                         error => path2.Should().BeError().Which.Should().Be(error));
@@ -931,10 +924,14 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
-            var asyncEnumerable = array.ToAsyncEnumerable();
+            // Arrange
+            var source = array.ToAsyncEnumerable();
+            var f = (int x) => ValueTask.FromResult(Option.Some(x));
 
-            var result = await asyncEnumerable.Traverse(Selectors.OptionIdentityAsync, CancellationToken);
+            // Act
+            var result = await source.Traverse(f, CancellationToken);
 
+            // Assert
             result.Should().BeSome().Which.Should().Equal(array);
         });
     }
@@ -942,16 +939,20 @@ public class AsyncEnumerableExtensionsTests
     [Fact]
     public async Task Traverse_with_option_passes_naturality_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringOptionTask
+                  select (array, f);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
-            var asyncEnumerable = array.ToAsyncEnumerable();
-            var selector = Selectors.MixedOptionAsync;
+            // Arrange
+            var (array, f) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-            var path1 = (await asyncEnumerable.Traverse(selector, CancellationToken)).ToResult(() => Error.From("test error"));
+            // Act
+            var path1 = (await source.Traverse(f, CancellationToken)).ToResult(() => Error.From("test error"));
 
-            var path2 = await asyncEnumerable.Traverse(async x => (await selector(x)).ToResult(() => Error.From("test error")), CancellationToken);
+            var path2 = await source.Traverse(async x => (await f(x)).ToResult(() => Error.From("test error")), CancellationToken);
 
             path1.Match(path1Array => path2.Should().BeSuccess().Which.Should().Equal(path1Array),
                         error => path2.Should().BeError().Which.Should().Be(error));
@@ -961,31 +962,37 @@ public class AsyncEnumerableExtensionsTests
     [Fact]
     public async Task Traverse_with_option_passes_composition_law()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToStringOptionTask
+                  from g in Generator.StringToIntResultTask
+                  select (array, f, g);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
-            var asyncEnumerable = array.ToAsyncEnumerable();
-            var optionSelector = Selectors.MixedOptionAsync;
-            var resultSelector = Selectors.MixedResultAsync;
+            // Arrange
+            var (array, f, g) = tuple;
+            var source = array.ToAsyncEnumerable();
 
-            var path1FirstPass = await asyncEnumerable.Traverse(async x =>
-            {
-                var option = await optionSelector(x);
-                return await option.MapTask(resultSelector);
-            }, CancellationToken);
+            // Act
+            var path1FirstPass = await source.Traverse(async x =>
+                                    {
+                                        var result = await f(x);
+                                        return await result.MapTask(g);
+                                    }, CancellationToken);
 
-            var path1 = await path1FirstPass.MapTask(resultArray => ValueTask.FromResult(resultArray.Traverse(x => x, CancellationToken)));
+            var path1 = await path1FirstPass.MapTask(optionArray => ValueTask.FromResult(optionArray.Traverse(x => x, CancellationToken)));
 
-            var path2FirstPass = await asyncEnumerable.Traverse(optionSelector, CancellationToken);
+            var path2FirstPass = await source.Traverse(f, CancellationToken);
+            var path2 = await path2FirstPass.MapTask(values => values.ToAsyncEnumerable()
+                                                                     .Traverse(g, CancellationToken));
 
-            var path2 = await path2FirstPass.MapTask(values => values.ToAsyncEnumerable().Traverse(resultSelector, CancellationToken));
-
+            // Assert
             path1.Match(path1Result => path1Result.Match(path1Array => path2.Should().BeSome().Which.Should().BeSuccess().Which.Should().Equal(path1Array),
                                                          error => path2.Should().BeSome().Which.Should().Be(error)),
                         () => path2.Should().BeNone());
         });
     }
+
     [Fact]
     public async Task IterTask_calls_action_for_each_element()
     {
@@ -993,17 +1000,22 @@ public class AsyncEnumerableExtensionsTests
 
         await gen.SampleAsync(async array =>
         {
-            var asyncEnumerable = array.ToAsyncEnumerable();
-            var addedItems = ImmutableArray.Create<int>();
+            // Arrange
+            var source = array.ToAsyncEnumerable();
 
-            await asyncEnumerable.IterTask(async x =>
+            var addedItems = ImmutableArray.Create<int>();
+            async ValueTask f(int x)
             {
                 ImmutableInterlocked.Update(ref addedItems, items => items.Add(x));
                 await ValueTask.CompletedTask;
-            }, CancellationToken);
+            }
+            ;
 
-            var expected = await asyncEnumerable.ToArrayAsync(CancellationToken);
-            addedItems.Should().BeEquivalentTo(expected);
+            // Act
+            await source.IterTask(f, CancellationToken);
+
+            // Assert
+            addedItems.Should().BeEquivalentTo(array);
         });
     }
 
@@ -1090,25 +1102,61 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task Tap_executes_side_effect_and_preserves_original_async_enumerable()
+    public async Task Tap_satisfies_identity_law()
     {
         var gen = Gen.Int.Array;
 
         await gen.SampleAsync(async array =>
         {
-            var tapCount = 0;
+            // Arrange
+            var source = array.ToAsyncEnumerable();
 
-            var result = await array.ToAsyncEnumerable()
-                                    .Tap(_ => tapCount++)
-                                    .ToArrayAsync(CancellationToken);
+            // Act
+            var result = await source.Tap(_ => { })
+                                     .ToArrayAsync(CancellationToken);
 
-            result.Should().BeEquivalentTo(array);
-            tapCount.Should().Be(array.Length);
+            // Assert
+            result.Should().Equal(array);
         });
     }
 
     [Fact]
-    public async Task Tap_is_lazily_evaluated_for_async_enumerable()
+    public async Task Tap_satisfies_composition_law()
+    {
+        var gen = from array in Gen.Int.Array
+                  from f in Generator.IntToString
+                  from g in Generator.IntToString
+                  select (array, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (array, f, g) = tuple;
+
+            var source = array.ToAsyncEnumerable();
+            var path1Sum = string.Empty;
+            var path2Sum = string.Empty;
+
+            // Act
+            var path1Array = await source.Tap(x => path1Sum += f(x))
+                                         .Tap(x => path1Sum += g(x))
+                                         .ToArrayAsync(CancellationToken);
+
+            var path2Array = await source.Tap(x =>
+                                              {
+                                                  path2Sum += f(x);
+                                                  path2Sum += g(x);
+                                              })
+                                         .ToArrayAsync(CancellationToken);
+
+            // Assert
+            path1Array.Should().Equal(path2Array);
+            path1Sum.Should().Be(path2Sum);
+        });
+    }
+
+    [Fact]
+    public async Task Tap_is_lazy()
     {
         var gen = Gen.Int.Array;
 
@@ -1132,52 +1180,37 @@ public class AsyncEnumerableExtensionsTests
     }
 
     [Fact]
-    public async Task TapTask_executes_side_effect_and_preserves_original_async_enumerable()
+    public async Task TapTask_with_sync_action_is_equivalent_to_Tap()
     {
-        var gen = Gen.Int.Array;
+        var gen = from array in Gen.Int.Array
+                  from f1 in Generator.IntToString
+                  select (array, f1);
 
-        await gen.SampleAsync(async array =>
+        await gen.SampleAsync(async tuple =>
         {
-            var tapCount = 0;
+            // Arrange
+            var (array, f1) = tuple;
 
-            var result = await array.ToAsyncEnumerable()
-                                    .TapTask(async _ =>
-                                    {
-                                        tapCount++;
-                                        await ValueTask.CompletedTask;
-                                    })
-                                    .ToArrayAsync(CancellationToken);
+            var source = array.ToAsyncEnumerable();
+            var f = (int x, List<string> accumulator) => accumulator.Add(f1(x));
 
-            result.Should().BeEquivalentTo(array);
-            tapCount.Should().Be(array.Length);
-        });
-    }
+            var tapAccumulator = new List<string>();
+            var tapTaskAccumulator = new List<string>();
 
-    [Fact]
-    public async Task TapTask_is_lazily_evaluated_for_async_enumerable()
-    {
-        var gen = Gen.Int.Array;
+            // Act
+            var tapResult = await source.Tap(x => f(x, tapAccumulator))
+                                        .ToArrayAsync(CancellationToken);
 
-        await gen.SampleAsync(async array =>
-        {
-            var tapCount = 0;
+            var tapTaskResult = await source.TapTask(async x =>
+                                                    {
+                                                        f(x, tapTaskAccumulator);
+                                                        await ValueTask.CompletedTask;
+                                                    })
+                                           .ToArrayAsync(CancellationToken);
 
-            // Create the tapped async enumerable but don't enumerate it yet
-            var tappedAsyncEnumerable = array.ToAsyncEnumerable()
-                                             .TapTask(async _ =>
-                                             {
-                                                 tapCount++;
-                                                 await ValueTask.CompletedTask;
-                                             });
-
-            // Side effect should not have executed yet
-            tapCount.Should().Be(0);
-
-            // Now enumerate it
-            await tappedAsyncEnumerable.ToArrayAsync(CancellationToken);
-
-            // Side effect should have executed for each element
-            tapCount.Should().Be(array.Length);
+            // Assert
+            tapResult.Should().Equal(tapTaskResult);
+            tapAccumulator.Should().Equal(tapTaskAccumulator);
         });
     }
 
