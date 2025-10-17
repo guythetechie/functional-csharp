@@ -34,7 +34,7 @@ internal static partial class Generator
         from f in IntToInt
         select (Func<string, int>)(s =>
         {
-            var sum = s.Aggregate(0L, (acc, c) => acc + c);
+            var sum = s.Sum(c => (long)c);
             var intSum = (int)Math.Clamp(sum, int.MinValue, int.MaxValue);
             return f(intSum);
         });
@@ -52,7 +52,7 @@ internal static partial class Generator
         from f in IntPredicate
         select (Func<string, bool>)(s =>
         {
-            var sum = s.Aggregate(0L, (acc, c) => acc + c);
+            var sum = s.Sum(c => (long)c);
             var intSum = (int)Math.Clamp(sum, int.MinValue, int.MaxValue);
             return f(intSum);
         });

@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace common;
 
 /// <summary>
-/// Represents a value that can be one of two types, either left or right.
+/// Represents a value that can be one of two types, either <typeparamref name="TLeft"/> or <typeparamref name="TRight"/>.
 /// </summary>
 public sealed record Either<TLeft, TRight>
 {
@@ -26,48 +26,42 @@ public sealed record Either<TLeft, TRight>
     }
 
     /// <summary>
-    /// Gets whether this either contains a left value.
+    /// True when the either contains a left value.
     /// </summary>
     public bool IsLeft => isLeft;
 
     /// <summary>
-    /// Gets whether this either contains a right value.
+    /// True when the either contains a right value.
     /// </summary>
     public bool IsRight => isLeft is false;
 
 #pragma warning disable CA1000 // Do not declare static members on generic types
     /// <summary>
-    /// Creates an either containing a left value.
+    /// Wraps <paramref name="left"/> in a left either.
     /// </summary>
-    /// <param name="left">The left value.</param>
-    /// <returns>Left(left).</returns>
     public static Either<TLeft, TRight> Left(TLeft left) =>
         new(left);
 
     /// <summary>
-    /// Creates an either containing a right value.
+    /// Wraps <paramref name="right"/> in a right either.
     /// </summary>
-    /// <param name="right">The right value.</param>
-    /// <returns>Right(right).</returns>
     public static Either<TLeft, TRight> Right(TRight right) =>
         new(right);
 #pragma warning restore CA1000 // Do not declare static members on generic types
 
     /// <summary>
-    /// Pattern matches on the either state.
+    /// Returns the result of <paramref name="onLeft"/> or <paramref name="onRight"/> based on the either's state.
     /// </summary>
-    /// <typeparam name="T">The return type.</typeparam>
-    /// <param name="onLeft">Function executed if the either contains a left value.</param>
-    /// <param name="onRight">Function executed if the either contains a right value.</param>
-    /// <returns>The result of the executed function.</returns>
+    /// <param name="onLeft">Executes when the either is Left.</param>
+    /// <param name="onRight">Executes when the either is Right.</param>
     public T Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight) =>
         IsLeft ? onLeft(left!) : onRight(right!);
 
     /// <summary>
-    /// Pattern matches on the either state for side effects.
+    /// Executes <paramref name="onLeft"/> or <paramref name="onRight"/> based on the either's state.
     /// </summary>
-    /// <param name="onLeft">Action executed if the either contains a left value.</param>
-    /// <param name="onRight">Action executed if the either contains a right value.</param>
+    /// <param name="onLeft">Executes when the either is Left.</param>
+    /// <param name="onRight">Executes when the either is Right.</param>
     public void Match(Action<TLeft> onLeft, Action<TRight> onRight)
     {
         if (IsLeft)
@@ -98,13 +92,13 @@ public sealed record Either<TLeft, TRight>
         HashCode.Combine(left, right);
 
     /// <summary>
-    /// Implicitly converts a left value to Left(left).
+    /// Converts a left value to <c>Left(left)</c>.
     /// </summary>
     public static implicit operator Either<TLeft, TRight>(TLeft left) =>
         Left(left);
 
     /// <summary>
-    /// Implicitly converts a right value to Right(right).
+    /// Converts a right value to <c>Right(right)</c>.
     /// </summary>
     public static implicit operator Either<TLeft, TRight>(TRight right) =>
         Right(right);
@@ -116,148 +110,87 @@ public sealed record Either<TLeft, TRight>
 public static class Either
 {
     /// <summary>
-    /// Creates an either containing a left value.
+    /// Wraps <paramref name="left"/> in a left either.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="left">The left value.</param>
-    /// <returns>Left(left).</returns>
     public static Either<TLeft, TRight> Left<TLeft, TRight>(TLeft left) =>
         Either<TLeft, TRight>.Left(left);
 
     /// <summary>
-    /// Creates an either containing a right value.
+    /// Wraps <paramref name="right"/> in a right either.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="right">The right value.</param>
-    /// <returns>Right(right).</returns>
     public static Either<TLeft, TRight> Right<TLeft, TRight>(TRight right) =>
         Either<TLeft, TRight>.Right(right);
 
     /// <summary>
-    /// Transforms the right value using a function.
+    /// Applies <paramref name="f"/> to the right value.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The source right type.</typeparam>
-    /// <typeparam name="TRight2">The result right type.</typeparam>
-    /// <param name="either">The either to transform.</param>
-    /// <param name="f">The transformation function.</param>
-    /// <returns>Right(f(right)) if Right, otherwise the original Left.</returns>
+    /// <returns><c>Right(f(right))</c> if Right, otherwise the original Left.</returns>
     public static Either<TLeft, TRight2> Map<TLeft, TRight, TRight2>(this Either<TLeft, TRight> either, Func<TRight, TRight2> f) =>
         either.Match(left => Left<TLeft, TRight2>(left),
                      right => Right<TLeft, TRight2>(f(right)));
 
     /// <summary>
-    /// Chains either operations together (monadic bind).
+    /// Chains either-returning operations (monadic bind).
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The source right type.</typeparam>
-    /// <typeparam name="TRight2">The result right type.</typeparam>
-    /// <param name="either">The either to bind.</param>
-    /// <param name="f">The function that returns an either.</param>
-    /// <returns>f(right) if Right, otherwise the original Left.</returns>
+    /// <returns><c>f(right)</c> if Right, otherwise the original Left.</returns>
     public static Either<TLeft, TRight2> Bind<TLeft, TRight, TRight2>(this Either<TLeft, TRight> either, Func<TRight, Either<TLeft, TRight2>> f) =>
         either.Match(left => Left<TLeft, TRight2>(left),
                      right => f(right));
 
     /// <summary>
-    /// Projects the either right value (LINQ support).
+    /// LINQ projection support. Enables syntax <c>from value in either select value</c>
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The source right type.</typeparam>
-    /// <typeparam name="TRight2">The result right type.</typeparam>
-    /// <param name="either">The either to project.</param>
-    /// <param name="f">The projection function.</param>
-    /// <returns>The projected either.</returns>
     public static Either<TLeft, TRight2> Select<TLeft, TRight, TRight2>(this Either<TLeft, TRight> either, Func<TRight, TRight2> f) =>
         either.Map(f);
 
     /// <summary>
-    /// Projects and flattens nested eithers (LINQ support).
+    /// LINQ flattening support. Enables syntax <c>from x in either1 from y in either2 select x + y</c>
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The source right type.</typeparam>
-    /// <typeparam name="TRight2">The intermediate right type.</typeparam>
-    /// <typeparam name="TResult">The result right type.</typeparam>
-    /// <param name="either">The source either.</param>
-    /// <param name="f">The function that returns an intermediate either.</param>
-    /// <param name="selector">The result selector function.</param>
-    /// <returns>The flattened result either.</returns>
     public static Either<TLeft, TResult> SelectMany<TLeft, TRight, TRight2, TResult>(this Either<TLeft, TRight> either, Func<TRight, Either<TLeft, TRight2>> f,
                                                          Func<TRight, TRight2, TResult> selector) =>
         either.Bind(right => f(right)
               .Map(right2 => selector(right, right2)));
 
     /// <summary>
-    /// Extracts the right value or converts the left value.
+    /// Returns the right value if Right, otherwise converts the left value.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="f">Function that converts left to right.</param>
-    /// <returns>The right value if Right, otherwise f(left).</returns>
     public static TRight IfLeft<TLeft, TRight>(this Either<TLeft, TRight> either, Func<TLeft, TRight> f) =>
         either.Match(f,
                      right => right);
 
     /// <summary>
-    /// Extracts the left value or converts the right value.
+    /// Returns the left value if Left, otherwise converts the right value.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="f">Function that converts right to left.</param>
-    /// <returns>The left value if Left, otherwise f(right).</returns>
     public static TLeft IfRight<TLeft, TRight>(this Either<TLeft, TRight> either, Func<TRight, TLeft> f) =>
         either.Match(left => left,
                      f);
 
     /// <summary>
-    /// Executes an action if the either contains a right value.
+    /// Executes <paramref name="f"/> when the either is Right.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="f">The action to execute.</param>
     public static void Iter<TLeft, TRight>(this Either<TLeft, TRight> either, Action<TRight> f) =>
         either.Match(_ => { },
                      f);
 
     /// <summary>
-    /// Executes an async action if the either contains a right value.
+    /// Asynchronously executes <paramref name="f"/> when the either is Right.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="f">The async action to execute.</param>
-    /// <returns>A task representing the async operation.</returns>
     public static async ValueTask IterTask<TLeft, TRight>(this Either<TLeft, TRight> either, Func<TRight, ValueTask> f) =>
         await either.Match<ValueTask>(_ => ValueTask.CompletedTask,
                                       async right => await f(right));
 
     /// <summary>
-    /// Extracts the right value or throws an exception.
+    /// Returns the right value if Right, otherwise throws the exception.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="exception">The exception to throw.</param>
-    /// <returns>The right value.</returns>
-    /// <exception cref="Exception">Thrown when the either contains a left value.</exception>
+    /// <exception cref="Exception">Thrown when the either is Left.</exception>
     public static TRight IfLeftThrow<TLeft, TRight>(this Either<TLeft, TRight> either, Exception exception) =>
         either.Match(_ => throw exception,
                      right => right);
 
     /// <summary>
-    /// Extracts the left value or throws an exception.
+    /// Returns the left value if Left, otherwise throws the exception.
     /// </summary>
-    /// <typeparam name="TLeft">The left type.</typeparam>
-    /// <typeparam name="TRight">The right type.</typeparam>
-    /// <param name="either">The either to check.</param>
-    /// <param name="exception">The exception to throw.</param>
-    /// <returns>The left value.</returns>
-    /// <exception cref="Exception">Thrown when the either contains a right value.</exception>
+    /// <exception cref="Exception">Thrown when the either is Right.</exception>
     public static TLeft IfRightThrow<TLeft, TRight>(this Either<TLeft, TRight> either, Exception exception) =>
         either.Match(left => left,
                      _ => throw exception);

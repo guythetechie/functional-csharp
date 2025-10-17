@@ -54,6 +54,80 @@ public class EnumerableExtensionsTests
     }
 
     [Fact]
+    public void Head_with_predicate_is_correct()
+    {
+        var gen = from array in Gen.Int.Array
+                  from predicate in Generator.IntPredicate
+                  select (array, predicate);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (array, predicate) = tuple;
+
+            // Act
+            var result = array.Head(predicate);
+
+            // Assert
+            result.Match(some =>
+                         {
+                             // The selected element satisfies the predicate
+                             predicate(some).Should().BeTrue();
+
+                             bool found = false;
+                             foreach (var item in array)
+                             {
+                                 if (item == some)
+                                 {
+                                     found = true;
+                                     break;
+                                 }
+                                 // No preceding elements satisfy the predicate
+                                 else
+                                 {
+                                     predicate(item).Should().BeFalse();
+                                 }
+                             }
+
+                             // The selected element was indeed found in the array
+                             found.Should().BeTrue();
+                         },
+                         () => array.Any(predicate).Should().BeFalse());
+        });
+    }
+
+    [Fact]
+    public void Head_with_predicate_is_lazy()
+    {
+        var gen = from array in Gen.Int.Array
+                  from predicate in Generator.IntPredicate
+                  select (array, predicate);
+
+        gen.Sample(tuple =>
+        {
+            // Arrange
+            var (array, predicate) = tuple;
+
+            var enumeratedItems = new List<int>();
+            var enumerable = array.Select(item =>
+            {
+                enumeratedItems.Add(item);
+                return item;
+            });
+
+            // Act
+            var result = enumerable.Head(predicate);
+
+            // Assert
+            var enumeratedLength = enumeratedItems.Count;
+            enumeratedItems.Should().Equal(array.Take(enumeratedLength));
+
+            result.Match(some => { enumeratedItems.Last().Should().Be(some); },
+                         () => enumeratedLength.Should().Be(array.Length));
+        });
+    }
+
+    [Fact]
     public void SingleOrNone_with_empty_enumerable_returns_none()
     {
         var emptyEnumerable = Enumerable.Empty<int>();

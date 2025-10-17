@@ -6,7 +6,7 @@ namespace common;
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
 /// <summary>
-/// Represents a type that may or may not contain a value.
+/// Represents a type that may or may not contain a value of type <typeparamref name="T"/>.
 /// </summary>
 public sealed record Option<T>
 #pragma warning restore CA1716 // Identifiers should not match keywords
@@ -26,12 +26,12 @@ public sealed record Option<T>
     }
 
     /// <summary>
-    /// Gets whether this option contains no value.
+    /// True when the option is empty.
     /// </summary>
     public bool IsNone => !isSome;
 
     /// <summary>
-    /// Gets whether this option contains a value.
+    /// True when the option contains a value.
     /// </summary>
     public bool IsSome => isSome;
 
@@ -42,7 +42,6 @@ public sealed record Option<T>
     /// <summary>
     /// Creates an empty option.
     /// </summary>
-    /// <returns>An option representing no value.</returns>
     public static Option<T> None() =>
         new();
 #pragma warning restore CA1000 // Do not declare static members on generic types
@@ -65,20 +64,18 @@ public sealed record Option<T>
         : EqualityComparer<T?>.Default.GetHashCode(value);
 
     /// <summary>
-    /// Pattern matches on the option state.
+    /// Returns the result of <paramref name="some"/> or <paramref name="none"/> based on the option's state.
     /// </summary>
-    /// <typeparam name="T2">The return type.</typeparam>
-    /// <param name="some">Function executed if the option contains a value.</param>
-    /// <param name="none">Function executed if the option is empty.</param>
-    /// <returns>The result of the executed function.</returns>
+    /// <param name="some">Executes when the option is Some.</param>
+    /// <param name="none">Executes when the option is None.</param>
     public T2 Match<T2>(Func<T, T2> some, Func<T2> none) =>
         IsSome ? some(value!) : none();
 
     /// <summary>
-    /// Pattern matches on the option state for side effects.
+    /// Executes <paramref name="some"/> or <paramref name="none"/> based on the option's state.
     /// </summary>
-    /// <param name="some">Action executed if the option contains a value.</param>
-    /// <param name="none">Action executed if the option is empty.</param>
+    /// <param name="some">Executes when the option is Some.</param>
+    /// <param name="none">Executes when the option is None.</param>
     public void Match(Action<T> some, Action none)
     {
         if (IsSome)
@@ -88,20 +85,20 @@ public sealed record Option<T>
     }
 
     /// <summary>
-    /// Implicitly converts a value to Some(value).
+    /// Converts a value to <c>Some(value)</c>.
     /// </summary>
     public static implicit operator Option<T>(T value) =>
         Some(value);
 
     /// <summary>
-    /// Implicitly converts None to an empty option.
+    /// Converts <see cref="common.None"/> to an empty option.
     /// </summary>
     public static implicit operator Option<T>(None _) =>
         None();
 }
 
 /// <summary>
-/// Represents the absence of a value in an option.
+/// Sentinel type for empty options.
 /// </summary>
 public readonly record struct None
 {
@@ -116,133 +113,86 @@ public static class Option
 #pragma warning restore CA1716 // Identifiers should not match keywords
 {
     /// <summary>
-    /// Creates an option containing a value.
+    /// Wraps <paramref name="value"/> in an <see cref="Option{T}"/>.
     /// </summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
-    /// <param name="value">The value to wrap.</param>
-    /// <returns>Some(value).</returns>
     public static Option<T> Some<T>(T value) =>
         Option<T>.Some(value);
 
     /// <summary>
-    /// A None value for creating empty options.
+    /// Singleton for creating empty options.
     /// </summary>
     public static None None { get; }
 
     /// <summary>
-    /// Filters an option using a predicate.
+    /// Returns the option if <paramref name="predicate"/> succeeds, otherwise <see cref="common.None"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to filter.</param>
-    /// <param name="predicate">The predicate function.</param>
-    /// <returns>The option if it satisfies the predicate, otherwise None.</returns>
     public static Option<T> Where<T>(this Option<T> option, Func<T, bool> predicate) =>
         option.Match(t => predicate(t) ? option : None,
                      () => None);
 
     /// <summary>
-    /// Transforms the option value using a function.
+    /// Applies <paramref name="f"/> to the wrapped value.
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="option">The option to transform.</param>
-    /// <param name="f">The transformation function.</param>
-    /// <returns>Some(f(value)) if Some, otherwise None.</returns>
+    /// <returns><c>Some(f(value))</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static Option<T2> Map<T, T2>(this Option<T> option, Func<T, T2> f) =>
         option.Match(t => Some(f(t)),
                      () => None);
 
     /// <summary>
-    /// Asynchronously transforms the option value using a function that returns a ValueTask.
+    /// Asynchronously applies <paramref name="f"/> to the wrapped value.
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="option">The option to transform.</param>
-    /// <param name="f">The async transformation function.</param>
-    /// <returns>Some(await f(value)) if Some, otherwise None.</returns>
+    /// <returns><c>Some(await f(value))</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static async ValueTask<Option<T2>> MapTask<T, T2>(this Option<T> option, Func<T, ValueTask<T2>> f) =>
         await option.Match(async t => Some(await f(t)),
                            async () => await ValueTask.FromResult(Option<T2>.None()));
 
     /// <summary>
-    /// Chains option operations together (monadic bind).
+    /// Chains option-returning operations (monadic bind).
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="option">The option to bind.</param>
-    /// <param name="f">The function that returns an option.</param>
-    /// <returns>f(value) if Some, otherwise None.</returns>
+    /// <returns><c>f(value)</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static Option<T2> Bind<T, T2>(this Option<T> option, Func<T, Option<T2>> f) =>
         option.Match(t => f(t),
                      () => None);
 
     /// <summary>
-    /// Asynchronously chains option operations together (monadic bind with async function).
+    /// Asynchronously chains option-returning operations (monadic bind).
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="option">The option to bind.</param>
-    /// <param name="f">The async function that returns an option.</param>
-    /// <returns>await f(value) if Some, otherwise None.</returns>
+    /// <returns><c>await f(value)</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static async ValueTask<Option<T2>> BindTask<T, T2>(this Option<T> option, Func<T, ValueTask<Option<T2>>> f) =>
         await option.Match(async t => await f(t),
                            async () => await ValueTask.FromResult(Option<T2>.None()));
 
     /// <summary>
-    /// Projects the option value (LINQ support).
+    /// LINQ projection support. Enables syntax <c>from value in option select value</c>
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="option">The option to project.</param>
-    /// <param name="f">The projection function.</param>
-    /// <returns>The projected option.</returns>
     public static Option<T2> Select<T, T2>(this Option<T> option, Func<T, T2> f) =>
         option.Map(f);
 
     /// <summary>
-    /// Projects and flattens nested options (LINQ support).
+    /// LINQ flattening support. Enables syntax <c>from x in option1 from y in option2 select x + y</c>
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The intermediate value type.</typeparam>
-    /// <typeparam name="TResult">The result value type.</typeparam>
-    /// <param name="option">The source option.</param>
-    /// <param name="f">The function that returns an intermediate option.</param>
-    /// <param name="selector">The result selector function.</param>
-    /// <returns>The flattened result option.</returns>
     public static Option<TResult> SelectMany<T, T2, TResult>(this Option<T> option, Func<T, Option<T2>> f,
                                                          Func<T, T2, TResult> selector) =>
         option.Bind(t => f(t).Map(t2 => selector(t, t2)));
 
     /// <summary>
-    /// Provides a fallback value for empty options.
+    /// Returns the wrapped value if Some, otherwise the result of <paramref name="f"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to check.</param>
-    /// <param name="f">Function that provides the default value.</param>
-    /// <returns>The option value if Some, otherwise the default value.</returns>
     public static T IfNone<T>(this Option<T> option, Func<T> f) =>
         option.Match(t => t,
                      f);
 
     /// <summary>
-    /// Provides a fallback option for empty options.
+    /// Returns this option if Some, otherwise the result of <paramref name="f"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to check.</param>
-    /// <param name="f">Function that provides the fallback option.</param>
-    /// <returns>The original option if Some, otherwise the fallback.</returns>
     public static Option<T> IfNone<T>(this Option<T> option, Func<Option<T>> f) =>
         option.Match(t => option,
                      f);
 
     /// <summary>
-    /// Extracts the option value or throws an exception.
+    /// Returns the wrapped value if Some, otherwise throws the result of <paramref name="getException"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to check.</param>
-    /// <param name="getException">Function that creates the exception to throw.</param>
-    /// <returns>The option value.</returns>
-    /// <exception cref="Exception">Thrown when the option is None.</exception>
+    /// <exception cref="Exception">Thrown when the option is <see cref="common.None"/>.</exception>
     public static T IfNoneThrow<T>(this Option<T> option, Func<Exception> getException) =>
         option.Match(t => t,
                      () => throw getException());
@@ -250,9 +200,7 @@ public static class Option
     /// <summary>
     /// Converts the option to a nullable reference type.
     /// </summary>
-    /// <typeparam name="T">The reference type.</typeparam>
-    /// <param name="option">The option to convert.</param>
-    /// <returns>The option value if Some, otherwise null.</returns>
+    /// <returns>The wrapped value if Some, otherwise <see langword="null"/>.</returns>
     public static T? IfNoneNull<T>(this Option<T> option) where T : class =>
     option.Match(t => (T?)t,
                  () => null);
@@ -260,30 +208,21 @@ public static class Option
     /// <summary>
     /// Converts the option to a nullable value type.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to convert.</param>
-    /// <returns>The option value if Some, otherwise null.</returns>
+    /// <returns>The wrapped value if Some, otherwise <see langword="null"/>.</returns>
     public static T? IfNoneNullable<T>(this Option<T> option) where T : struct =>
         option.Match(t => (T?)t,
                      () => null);
 
     /// <summary>
-    /// Executes an action if the option contains a value.
+    /// Executes <paramref name="f"/> when the option is Some.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to check.</param>
-    /// <param name="f">The action to execute.</param>
     public static void Iter<T>(this Option<T> option, Action<T> f) =>
         option.Match(f,
                      () => { });
 
     /// <summary>
-    /// Executes an async action if the option contains a value.
+    /// Asynchronously executes <paramref name="f"/> when the option is Some.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="option">The option to check.</param>
-    /// <param name="f">The async action to execute.</param>
-    /// <returns>A task representing the async operation.</returns>
     public static async ValueTask IterTask<T>(this Option<T> option, Func<T, ValueTask> f) =>
         await option.Match<ValueTask>(async t => await f(t),
                                       () => ValueTask.CompletedTask);

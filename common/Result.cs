@@ -5,7 +5,7 @@ using System.Threading.Tasks;
 namespace common;
 
 /// <summary>
-/// Represents the result of an operation that can either succeed with a value or fail with an error.
+/// Represents the result of an operation that can either succeed with a value of type <typeparamref name="T"/> or fail with an <see cref="common.Error"/>.
 /// </summary>
 public sealed record Result<T>
 {
@@ -26,12 +26,12 @@ public sealed record Result<T>
     }
 
     /// <summary>
-    /// Gets whether this result represents a success.
+    /// True when the result is successful.
     /// </summary>
     public bool IsSuccess => isSuccess;
 
     /// <summary>
-    /// Gets whether this result represents an error.
+    /// True when the result is an error.
     /// </summary>
     public bool IsError => isSuccess is false;
 
@@ -44,20 +44,18 @@ public sealed record Result<T>
 #pragma warning restore CA1000 // Do not declare static members on generic types
 
     /// <summary>
-    /// Pattern matches on the result state.
+    /// Returns the result of <paramref name="onSuccess"/> or <paramref name="onError"/> based on the result's state.
     /// </summary>
-    /// <typeparam name="TResult">The return type.</typeparam>
-    /// <param name="onSuccess">Function executed if the result is successful.</param>
-    /// <param name="onError">Function executed if the result is an error.</param>
-    /// <returns>The result of the executed function.</returns>
+    /// <param name="onSuccess">Executes when the result is successful.</param>
+    /// <param name="onError">Executes when the result is an error.</param>
     public TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onError) =>
         IsSuccess ? onSuccess(value!) : onError(error!);
 
     /// <summary>
-    /// Pattern matches on the result state for side effects.
+    /// Executes <paramref name="onSuccess"/> or <paramref name="onError"/> based on the result's state.
     /// </summary>
-    /// <param name="onSuccess">Action executed if the result is successful.</param>
-    /// <param name="onError">Action executed if the result is an error.</param>
+    /// <param name="onSuccess">Executes when the result is successful.</param>
+    /// <param name="onError">Executes when the result is an error.</param>
     public void Match(Action<T> onSuccess, Action<Error> onError)
     {
         if (IsSuccess)
@@ -88,13 +86,13 @@ public sealed record Result<T>
         HashCode.Combine(value, error);
 
     /// <summary>
-    /// Implicitly converts a value to Success(value).
+    /// Converts a value to <c>Success(value)</c>.
     /// </summary>
     public static implicit operator Result<T>(T value) =>
         Success(value);
 
     /// <summary>
-    /// Implicitly converts an error to Error(error).
+    /// Converts an <see cref="common.Error"/> to <c>Error(error)</c>.
     /// </summary>
     public static implicit operator Result<T>(Error error) =>
         Error(error);
@@ -106,157 +104,102 @@ public sealed record Result<T>
 public static class Result
 {
     /// <summary>
-    /// Creates a successful result containing a value.
+    /// Wraps <paramref name="value"/> in a <see cref="Result{T}"/>.
     /// </summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
-    /// <param name="value">The value to wrap.</param>
-    /// <returns>Success(value).</returns>
     public static Result<T> Success<T>(T value) =>
         Result<T>.Success(value);
 
     /// <summary>
-    /// Creates an error result containing an error.
+    /// Wraps <paramref name="error"/> in a <see cref="Result{T}"/>.
     /// </summary>
-    /// <typeparam name="T">The type of the value.</typeparam>
-    /// <param name="error">The error to wrap.</param>
-    /// <returns>Error(error).</returns>
     public static Result<T> Error<T>(Error error) =>
         Result<T>.Error(error);
 
     /// <summary>
-    /// Transforms the success value using a function.
+    /// Applies <paramref name="f"/> to the success value.
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="result">The result to transform.</param>
-    /// <param name="f">The transformation function.</param>
-    /// <returns>Success(f(value)) if successful, otherwise the original error.</returns>
+    /// <returns><c>Success(f(value))</c> if successful, otherwise the original error.</returns>
     public static Result<T2> Map<T, T2>(this Result<T> result, Func<T, T2> f) =>
         result.Match(value => Success(f(value)),
                      error => Error<T2>(error));
 
     /// <summary>
-    /// Asynchronously transforms the success value using a function that returns a ValueTask.
+    /// Asynchronously applies <paramref name="f"/> to the success value.
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="result">The result to transform.</param>
-    /// <param name="f">The async transformation function.</param>
-    /// <returns>Success(await f(value)) if successful, otherwise the original error.</returns>
+    /// <returns><c>Success(await f(value))</c> if successful, otherwise the original error.</returns>
     public static async ValueTask<Result<T2>> MapTask<T, T2>(this Result<T> result, Func<T, ValueTask<T2>> f) =>
         await result.Match(async value => Success(await f(value)),
                            async error => await ValueTask.FromResult(Error<T2>(error)));
 
     /// <summary>
-    /// Transforms the error, preserving any success value.
+    /// Applies <paramref name="f"/> to the error, preserving any success value.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to transform.</param>
-    /// <param name="f">The error transformation function.</param>
-    /// <returns>The original success, or Error(f(error)) if error.</returns>
+    /// <returns>The original success, or <c>Error(f(error))</c> if error.</returns>
     public static Result<T> MapError<T>(this Result<T> result, Func<Error, Error> f) =>
         result.Match(value => Success(value),
                      error => Error<T>(f(error)));
 
     /// <summary>
-    /// Chains result operations together (monadic bind).
+    /// Chains result-returning operations (monadic bind).
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="result">The result to bind.</param>
-    /// <param name="f">The function that returns a result.</param>
-    /// <returns>f(value) if successful, otherwise the original error.</returns>
+    /// <returns><c>f(value)</c> if successful, otherwise the original error.</returns>
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
         result.Match(value => f(value),
                      error => Error<T2>(error));
 
     /// <summary>
-    /// Asynchronously chains result operations together (monadic bind with async function).
+    /// Asynchronously chains result-returning operations (monadic bind).
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="result">The result to bind.</param>
-    /// <param name="f">The async function that returns a result.</param>
-    /// <returns>await f(value) if successful, otherwise the original error.</returns>
+    /// <returns><c>await f(value)</c> if successful, otherwise the original error.</returns>
     public static async ValueTask<Result<T2>> BindTask<T, T2>(this Result<T> result, Func<T, ValueTask<Result<T2>>> f) =>
         await result.Match(async value => await f(value),
                            async error => await ValueTask.FromResult(Error<T2>(error)));
 
     /// <summary>
-    /// Projects the result value (LINQ support).
+    /// LINQ projection support. Enables syntax <c>from value in result select value</c>
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The result value type.</typeparam>
-    /// <param name="result">The result to project.</param>
-    /// <param name="f">The projection function.</param>
-    /// <returns>The projected result.</returns>
     public static Result<T2> Select<T, T2>(this Result<T> result, Func<T, T2> f) =>
         result.Map(f);
 
     /// <summary>
-    /// Projects and flattens nested results (LINQ support).
+    /// LINQ flattening support. Enables syntax <c>from x in result1 from y in result2 select x + y</c>
     /// </summary>
-    /// <typeparam name="T">The source value type.</typeparam>
-    /// <typeparam name="T2">The intermediate value type.</typeparam>
-    /// <typeparam name="TResult">The result value type.</typeparam>
-    /// <param name="result">The source result.</param>
-    /// <param name="f">The function that returns an intermediate result.</param>
-    /// <param name="selector">The result selector function.</param>
-    /// <returns>The flattened result.</returns>
     public static Result<TResult> SelectMany<T, T2, TResult>(this Result<T> result, Func<T, Result<T2>> f,
                                                              Func<T, T2, TResult> selector) =>
         result.Bind(value => f(value)
               .Map(value2 => selector(value, value2)));
 
     /// <summary>
-    /// Provides a fallback value for error results.
+    /// Returns the success value if successful, otherwise the result of <paramref name="f"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to check.</param>
-    /// <param name="f">Function that provides the fallback value.</param>
-    /// <returns>The success value if successful, otherwise the fallback value.</returns>
     public static T IfError<T>(this Result<T> result, Func<Error, T> f) =>
         result.Match(value => value,
                      f);
 
     /// <summary>
-    /// Provides a fallback result for error results.
+    /// Returns this result if successful, otherwise the result of <paramref name="f"/>.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to check.</param>
-    /// <param name="f">Function that provides the fallback result.</param>
-    /// <returns>The original result if successful, otherwise the fallback.</returns>
     public static Result<T> IfError<T>(this Result<T> result, Func<Error, Result<T>> f) =>
         result.Match(_ => result,
                      f);
 
     /// <summary>
-    /// Executes an action if the result is successful.
+    /// Executes <paramref name="f"/> when the result is successful.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to check.</param>
-    /// <param name="f">The action to execute.</param>
     public static void Iter<T>(this Result<T> result, Action<T> f) =>
         result.Match(f,
                      _ => { });
 
     /// <summary>
-    /// Executes an async action if the result is successful.
+    /// Asynchronously executes <paramref name="f"/> when the result is successful.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to check.</param>
-    /// <param name="f">The async action to execute.</param>
-    /// <returns>A task representing the async operation.</returns>
     public static async ValueTask IterTask<T>(this Result<T> result, Func<T, ValueTask> f) =>
         await result.Match<ValueTask>(async value => await f(value),
                                       _ => ValueTask.CompletedTask);
 
     /// <summary>
-    /// Extracts the success value or throws the error as an exception.
+    /// Returns the success value or throws the error as an exception.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to check.</param>
-    /// <returns>The success value.</returns>
     /// <exception cref="Exception">Thrown when the result is an error.</exception>
     public static T IfErrorThrow<T>(this Result<T> result) =>
         result.Match(value => value,
@@ -265,9 +208,7 @@ public static class Result
     /// <summary>
     /// Converts the result to a nullable reference type.
     /// </summary>
-    /// <typeparam name="T">The reference type.</typeparam>
-    /// <param name="result">The result to convert.</param>
-    /// <returns>The success value if successful, otherwise null.</returns>
+    /// <returns>The success value if successful, otherwise <see langword="null"/>.</returns>
     public static T? IfErrorNull<T>(this Result<T> result) where T : class =>
         result.Match(value => (T?)value,
                      _ => null);
@@ -275,19 +216,15 @@ public static class Result
     /// <summary>
     /// Converts the result to a nullable value type.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to convert.</param>
-    /// <returns>The success value if successful, otherwise null.</returns>
+    /// <returns>The success value if successful, otherwise <see langword="null"/>.</returns>
     public static T? IfErrorNullable<T>(this Result<T> result) where T : struct =>
         result.Match(value => (T?)value,
                      _ => null);
 
     /// <summary>
-    /// Converts a result to an option, discarding error information.
+    /// Converts the result to an <see cref="Option{T}"/>, discarding error information.
     /// </summary>
-    /// <typeparam name="T">The value type.</typeparam>
-    /// <param name="result">The result to convert.</param>
-    /// <returns>Some(value) if the result is successful, otherwise None.</returns>
+    /// <returns><c>Some(value)</c> if successful, otherwise <see cref="Option.None"/>.</returns>
     public static Option<T> ToOption<T>(this Result<T> result) =>
         result.Match(Option.Some, _ => Option.None);
 }

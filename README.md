@@ -36,7 +36,7 @@ Option<string> fromNone = Option.None;   // None
 ```
 
 #### `T2 Match<T2>(Func<T, T2> some, Func<T2> none)`
-Pattern matches on the option state.
+Returns the result of one of two functions based on the option's state.
 
 ```csharp
 Option<string> userEmail = GetUserEmail(userId);
@@ -47,7 +47,7 @@ string displayText = userEmail.Match(
 ```
 
 #### `void Match(Action<T> some, Action none)`
-Pattern matches on the option state for side effects.
+Executes one of two actions based on the option's state.
 
 ```csharp
 Option<User> currentUser = GetCurrentUser();
@@ -58,20 +58,20 @@ currentUser.Match(
 ```
 
 #### `Option<T2> Map<T2>(Func<T, T2> mapper)`
-Transforms the option value using a function.
+Applies a function to the wrapped value.
 
 ```csharp
 Option<string> userInput = GetUserInput();
 Option<int> inputLength = userInput.Map(input => input.Length);
 
 // Chain transformations
-Option<decimal> price = Option.Some("29.99");
-Option<decimal> tax = price.Map(p => decimal.Parse(p))
-                           .Map(p => p * 0.08m); // Some(2.3992m)
+Option<string> price = Option.Some("29.99");
+Option<decimal> priceWithTax = price.Map(p => decimal.Parse(p))
+                                    .Map(p => p * 1.08m); // Some(32.3892m)
 ```
 
 #### `ValueTask<Option<T2>> MapTask<T2>(Func<T, ValueTask<T2>> asyncMapper)`
-Asynchronously transforms the option value using a function that returns a ValueTask.
+Asynchronously applies a function to the wrapped value.
 
 ```csharp
 Option<string> filePath = Option.Some("config.json");
@@ -79,19 +79,20 @@ Option<string> fileContent = await filePath.MapTask(async path =>
     await File.ReadAllTextAsync(path));
 
 // Chain async transformations
-Option<User> user = Option.Some("user123");
-Option<UserProfile> profile = await user.MapTask(async userId =>
-    await LoadUserProfileAsync(userId));
+Option<string> userId = Option.Some("user123");
+Option<UserProfile> profile = await userId.MapTask(async id =>
+    await LoadUserProfileAsync(id));
 ```
 
 #### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
-Chains option operations together (monadic bind).
+Chains option-returning operations (monadic bind).
 
 ```csharp
 Option<string> userId = Option.Some("123");
 Option<User> user = userId.Bind(id => FindUserById(id));
 Option<string> userEmail = user.Bind(u => GetUserEmail(u.Id));
 
+// FindUserById returns Option<User> (might not find the user)
 static Option<User> FindUserById(string id) =>
     id == "123"
         ? Option.Some(new User("John"))
@@ -99,7 +100,7 @@ static Option<User> FindUserById(string id) =>
 ```
 
 #### `ValueTask<Option<T2>> BindTask<T2>(Func<T, ValueTask<Option<T2>>> asyncBinder)`
-Asynchronously chains option operations together (monadic bind with async function).
+Asynchronously chains option-returning operations (monadic bind).
 
 ```csharp
 Option<string> userId = Option.Some("123");
@@ -114,14 +115,14 @@ static async ValueTask<Option<User>> FindUserByIdAsync(string id)
 ```
 
 #### `Option<T> Where(Func<T, bool> predicate)`
-Filters an option using a predicate.
+Returns the option if the predicate succeeds, otherwise None.
 
 ```csharp
-Option<int> userAge = Option.Some(17);
-Option<int> adultAge = userAge.Where(age => age >= 18); // None (17 is less than 18)
+Option<int> userAge = Option.Some(25);
+Option<int> adultAge = userAge.Where(age => age >= 18); // Some(25)
 
-Option<int> validAge = Option.Some(25);
-Option<int> filteredAge = validAge.Where(age => age >= 18); // Some(25)
+Option<int> childAge = Option.Some(17);
+Option<int> adultAge2 = childAge.Where(age => age >= 18); // None
 ```
 
 #### LINQ Support
@@ -141,7 +142,7 @@ orderSummary.Match(
 ```
 
 #### `T IfNone(Func<T> defaultProvider)`
-Provides a fallback value for empty options.
+Returns the wrapped value if Some, otherwise the result of the fallback function.
 
 ```csharp
 Option<string> userName = GetUserName();
@@ -149,7 +150,7 @@ string displayName = userName.IfNone(() => "Anonymous User");
 ```
 
 #### `Option<T> IfNone(Func<Option<T>> fallbackProvider)`
-Provides a fallback option for empty options.
+Returns this option if Some, otherwise the result of the fallback function.
 
 ```csharp
 Option<Config> primaryConfig = LoadPrimaryConfig();
@@ -159,15 +160,10 @@ Option<Config> configWithFallback = primaryConfig.IfNone(() => LoadDefaultConfig
 Option<User> user = GetUserFromCache(userId)
     .IfNone(() => GetUserFromDatabase(userId))
     .IfNone(() => GetGuestUser());
-
-user.Match(
-    u => Console.WriteLine($"Found user: {u.Name}"),
-    () => Console.WriteLine("No user available")
-);
 ```
 
 #### `T IfNoneThrow(Func<Exception> getException)`
-Extracts the option value or throws an exception.
+Returns the wrapped value if Some, otherwise throws the exception.
 
 ```csharp
 Option<DatabaseConnection> connection = EstablishConnection();
@@ -177,7 +173,7 @@ DatabaseConnection activeConnection = connection.IfNoneThrow(
 ```
 
 #### `void Iter(Action<T> action)`
-Executes an action if the option contains a value.
+Executes an action when the option is Some.
 
 ```csharp
 Option<LogEntry> latestEntry = GetLatestLogEntry();
@@ -185,7 +181,7 @@ latestEntry.Iter(entry => Console.WriteLine($"Latest: {entry.Message}"));
 ```
 
 #### `ValueTask IterTask(Func<T, ValueTask> asyncAction)`
-Executes an async action if the option contains a value.
+Asynchronously executes an action when the option is Some.
 
 ```csharp
 Option<string> filePath = GetConfigFilePath();
@@ -197,8 +193,7 @@ Converts the option to a nullable reference type.
 
 ```csharp
 Option<string> userName = GetUserName();
-string? nullableUserName = userName.IfNoneNull(); // Returns null if None, otherwise the string value
-
+string? nullableUserName = userName.IfNoneNull(); // null if None, otherwise the value
 ```
 
 #### `T? IfNoneNullable()`
@@ -206,7 +201,7 @@ Converts the option to a nullable value type.
 
 ```csharp
 Option<int> userId = GetUserId();
-int? nullableUserId = userId.IfNoneNullable(); // Returns null if None, otherwise the int value
+int? nullableUserId = userId.IfNoneNullable(); // null if None, otherwise the value
 ```
 
 ---
@@ -231,7 +226,7 @@ Result<string> fromError = Error.From("failure");       // Error
 ```
 
 #### `TResult Match<TResult>(Func<T, TResult> onSuccess, Func<Error, TResult> onError)`
-Pattern matches on the result state.
+Returns the result of one of two functions based on the result's state.
 
 ```csharp
 Result<User> userResult = AuthenticateUser(credentials);
@@ -242,7 +237,7 @@ string message = userResult.Match(
 ```
 
 #### `void Match(Action<T> onSuccess, Action<Error> onError)`
-Pattern matches on the result state for side effects.
+Executes one of two actions based on the result's state.
 
 ```csharp
 Result<Order> orderResult = ProcessOrder(orderRequest);
@@ -253,19 +248,19 @@ orderResult.Match(
 ```
 
 #### `Result<T2> Map<T2>(Func<T, T2> mapper)`
-Transforms the success value using a function.
+Applies a function to the success value.
 
 ```csharp
 Result<string> userInput = ValidateInput(request);
 Result<UserCommand> command = userInput.Map(input => ParseCommand(input));
 
-// Transform errors are preserved
+// Errors are preserved
 Result<string> invalidInput = Result.Error<string>(Error.From("Invalid format"));
 Result<UserCommand> failedCommand = invalidInput.Map(input => ParseCommand(input)); // Error("Invalid format")
 ```
 
 #### `ValueTask<Result<T2>> MapTask<T2>(Func<T, ValueTask<T2>> asyncMapper)`
-Asynchronously transforms the success value using a function that returns a ValueTask.
+Asynchronously applies a function to the success value.
 
 ```csharp
 Result<string> configPath = Result.Success("appsettings.json");
@@ -279,38 +274,39 @@ Result<Configuration> errorResult = await invalidPath.MapTask(async path =>
 ```
 
 #### `Result<T> MapError(Func<Error, Error> mapper)`
-Transforms the error if the result is in error; otherwise preserves the success value.
+Applies a function to the error, preserving any success value.
 
 ```csharp
-// Success values are preserved unchanged
+// Success values are preserved
 Result<User> successResult = Result.Success(new User("Alice"));
-Result<User> unchangedSuccess = successResult.MapError(error => Error.From("Won't be called")); // Success(User("Alice"))
+Result<User> stillSuccess = successResult.MapError(error => 
+    Error.From("Won't be called")); // Success(User("Alice"))
 
-// Error transformation with context
+// Add context to errors
 Result<ConfigFile> configResult = LoadConfig("settings.json");
 Result<ConfigFile> contextualError = configResult.MapError(error =>
     error + Error.From($"Failed to load configuration from settings.json"));
 ```
+
 #### `Result<T2> Bind<T2>(Func<T, Result<T2>> binder)`
-Chains result operations together (monadic bind).
+Chains result-returning operations (monadic bind).
 
 ```csharp
 // Chain validation and processing steps
 Result<Payment> paymentResult =
-    Result.Success(orderRequest)
-          .Bind(req => PaymentGateway.Validate(req))
-          .Bind(valid => PaymentGateway.Charge(valid));
+    ValidateOrderRequest(orderRequest)
+          .Bind(req => ValidatePaymentInfo(req))
+          .Bind(validated => ChargePayment(validated));
 ```
 
 #### `ValueTask<Result<T2>> BindTask<T2>(Func<T, ValueTask<Result<T2>>> asyncBinder)`
-Asynchronously chains result operations together (monadic bind with async function).
+Asynchronously chains result-returning operations (monadic bind).
 
 ```csharp
-Result<Order> orderResult = Result.Success(orderRequest);
-Result<ValidatedOrder> validatedResult = await orderResult
-    .BindTask(async req => await PaymentGateway.ValidateAsync(req));
-Result<PaymentResult> paymentResult = await validatedResult
-    .BindTask(async valid => await PaymentGateway.ChargeAsync(valid));
+Result<Order> orderResult = ValidateOrder(orderRequest);
+Result<Payment> paymentResult = await orderResult
+    .BindTask(async order => await ValidatePaymentAsync(order))
+    .BindTask(async validated => await ChargePaymentAsync(validated));
 ```
 
 #### LINQ Support
@@ -329,7 +325,7 @@ result.Match(
 ```
 
 #### `T IfError(Func<Error, T> errorHandler)`
-Provides a fallback value for error results.
+Returns the success value if successful, otherwise the result of the fallback function.
 
 ```csharp
 Result<User> userResult = GetUser(userId);
@@ -337,7 +333,7 @@ User user = userResult.IfError(error => new User("Guest"));
 ```
 
 #### `Result<T> IfError(Func<Error, Result<T>> errorHandler)`
-Provides a fallback result for error results. This allows for chaining error recovery operations that might themselves fail.
+Returns this result if successful, otherwise the result of the fallback function.
 
 ```csharp
 Result<User> userResult = GetUser(userId);
@@ -351,7 +347,7 @@ Result<Config> configResult = LoadPrimaryConfig()
 ```
 
 #### `T IfErrorThrow()`
-Extracts the success value or throws the error as an exception.
+Returns the success value or throws the error as an exception.
 
 ```csharp
 Result<DatabaseConnection> connectionResult = ConnectToDatabase();
@@ -359,7 +355,7 @@ DatabaseConnection connection = connectionResult.IfErrorThrow(); // Throws if co
 ```
 
 #### `void Iter(Action<T> action)`
-Executes an action if the result is successful.
+Executes an action when the result is successful.
 
 ```csharp
 Result<Report> reportResult = GenerateReport(parameters);
@@ -367,7 +363,7 @@ reportResult.Iter(report => SaveReportToFile(report));
 ```
 
 #### `ValueTask IterTask(Func<T, ValueTask> asyncAction)`
-Executes an async action if the result is successful.
+Asynchronously executes an action when the result is successful.
 
 ```csharp
 Result<EmailMessage> emailResult = ComposeEmail(recipient, subject, body);
@@ -375,7 +371,7 @@ await emailResult.IterTask(async email => await SendEmailAsync(email));
 ```
 
 #### `Option<T> ToOption()`
-Converts a Result to an Option. Success values become Some, errors become None.
+Converts the result to an option, discarding error information.
 
 ```csharp
 Result<User> userResult = GetUser(userId);
@@ -388,19 +384,19 @@ userOption.Match(
 ```
 
 #### `T? IfErrorNull()`
-Converts the result to a nullable reference type. Returns the value if successful, otherwise returns null.
+Converts the result to a nullable reference type.
 
 ```csharp
 Result<string> apiResponse = CallApi();
-string? nullableResponse = apiResponse.IfErrorNull(); // Returns null if error, otherwise the string value
+string? nullableResponse = apiResponse.IfErrorNull(); // null if error, otherwise the value
 ```
 
 #### `T? IfErrorNullable()`
-Converts the result to a nullable value type. Returns the value if successful, otherwise returns null.
+Converts the result to a nullable value type.
 
 ```csharp
 Result<int> calculationResult = PerformCalculation();
-int? nullableResult = calculationResult.IfErrorNullable(); // Returns null if error, otherwise the int value
+int? nullableResult = calculationResult.IfErrorNullable(); // null if error, otherwise the value
 ```
 
 ---
@@ -408,6 +404,8 @@ int? nullableResult = calculationResult.IfErrorNullable(); // Returns null if er
 ### Either&lt;TLeft, TRight&gt;
 
 Represents a value that can be one of two types, either left or right.
+
+> **Note:** Unlike `Result<T>` (which distinguishes success from error) or `Option<T>` (which distinguishes some from none), `Either` treats both states as equally valid. The choice of left vs. right is purely conventional and depends on your use case. Use `Either` when you need to represent two valid alternatives, not just success/failure scenarios.
 
 ```csharp
 // Creating Left values
@@ -426,18 +424,18 @@ Either<string, int> rightValue = 42;                     // Right(42)
 ```
 
 #### `T Match<T>(Func<TLeft, T> onLeft, Func<TRight, T> onRight)`
-Pattern matches on the either state.
+Returns the result of `onLeft` or `onRight` based on the either's state.
 
 ```csharp
-Either<DatabaseResult, CacheResult> dataSource = GetData(useCache: true);
+Either<CacheResult, DatabaseResult> dataSource = GetData(useCache: true);
 string sourceInfo = dataSource.Match(
-    dbResult => $"Loaded from database: {dbResult.RecordCount} records",
-    cacheResult => $"Loaded from cache: {cacheResult.Age} seconds old"
+    cacheResult => $"Loaded from cache: {cacheResult.Age} seconds old",
+    dbResult => $"Loaded from database: {dbResult.RecordCount} records"
 );
 ```
 
 #### `void Match(Action<TLeft> onLeft, Action<TRight> onRight)`
-Pattern matches on the either state for side effects.
+Executes `onLeft` or `onRight` based on the either's state.
 
 ```csharp
 Either<EmailNotification, SmsNotification> notification = ChooseNotificationMethod(user);
@@ -448,19 +446,19 @@ notification.Match(
 ```
 
 #### `Either<TLeft, TRight2> Map<TRight2>(Func<TRight, TRight2> mapper)`
-Transforms the right value using a function.
+Applies `mapper` to the right value.
 
 ```csharp
 Either<ErrorMessage, UserData> userData = LoadUserData(userId);
 Either<ErrorMessage, string> displayName = userData.Map(data => data.FullName);
 
-// Left values are preserved unchanged
+// Left values are preserved
 Either<ErrorMessage, UserData> errorCase = Either.Left<ErrorMessage, UserData>(new ErrorMessage("Not found"));
 Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName); // Left(ErrorMessage("Not found"))
 ```
 
 #### `Either<TLeft, TRight2> Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
-Chains either operations together (monadic bind).
+Chains either-returning operations (monadic bind).
 
 ```csharp
 // Chain operations that return Either results
@@ -483,10 +481,15 @@ var result = from source in DetermineDataSource(config)
              from data in LoadFromSource(source)
              from processed in ProcessData(data)
              select new ProcessedResult(processed);
+
+result.Match(
+    leftError => Console.WriteLine($"Processing failed: {leftError}"),
+    processedResult => SaveResult(processedResult)
+);
 ```
 
 #### `TRight IfLeft(Func<TLeft, TRight> leftHandler)`
-Extracts the right value or converts the left value.
+Returns the right value if Right, otherwise converts the left value.
 
 ```csharp
 Either<DefaultConfig, CustomConfig> configChoice = LoadUserConfig();
@@ -494,7 +497,7 @@ CustomConfig finalConfig = configChoice.IfLeft(defaultCfg => ConvertToCustomConf
 ```
 
 #### `TLeft IfRight(Func<TRight, TLeft> rightHandler)`
-Extracts the left value or converts the right value.
+Returns the left value if Left, otherwise converts the right value.
 
 ```csharp
 Either<BasicPlan, PremiumPlan> userPlan = Either.Right<BasicPlan, PremiumPlan>(premiumFeatures);
@@ -502,7 +505,7 @@ BasicPlan planForLogging = userPlan.IfRight(premium => CreateBasicSummary(premiu
 ```
 
 #### `TRight IfLeftThrow(Exception exception)`
-Extracts the right value or throws an exception.
+Returns the right value if Right, otherwise throws the exception.
 
 ```csharp
 Either<TrialVersion, FullVersion> softwareVersion = CheckLicense();
@@ -510,7 +513,7 @@ FullVersion licensed = softwareVersion.IfLeftThrow(new InvalidOperationException
 ```
 
 #### `TLeft IfRightThrow(Exception exception)`
-Extracts the left value or throws an exception.
+Returns the left value if Left, otherwise throws the exception.
 
 ```csharp
 Either<BasicPlan, PremiumPlan> userPlan = Either.Left<BasicPlan, PremiumPlan>(basicFeatures);
@@ -518,7 +521,7 @@ BasicPlan plan = userPlan.IfRightThrow(new InvalidOperationException("Expected b
 ```
 
 #### `void Iter(Action<TRight> action)`
-Executes an action if the either contains a right value.
+Executes `action` when the either is Right.
 
 ```csharp
 Either<PreviewMode, PublishMode> mode = DeterminePublishingMode(document);
@@ -526,7 +529,7 @@ mode.Iter(publish => ExecutePublishWorkflow(publish));
 ```
 
 #### `ValueTask IterTask(Func<TRight, ValueTask> asyncAction)`
-Executes an async action if the either contains a right value.
+Asynchronously executes `asyncAction` when the either is Right.
 
 ```csharp
 Either<CacheResult, DatabaseResult> dataSource = GetDataSource();
@@ -537,58 +540,174 @@ await dataSource.IterTask(async dbResult => await ProcessDatabaseResultAsync(dbR
 
 ### Error
 
-Represents error information that can contain multiple error messages or wrap exceptions.
+Represents error information containing messages and/or exceptions. Messages are case-insensitive and automatically deduplicated.
 
 ```csharp
-// Single error message
-Error singleError = Error.From("User not found");
+// Creating from messages
+Error singleMessage = Error.From("User not found");
+Error multipleMessages = Error.From("Invalid email", "Password too short", "Username taken");
 
-// Multiple error messages
-Error multipleErrors = Error.From("Invalid email", "Password too short", "Username taken");
-
-// From exception
-Error exceptionError = Error.From(new FileNotFoundException("Config file missing"));
+// Creating from exceptions
+Error singleException = Error.From(new FileNotFoundException("Config file missing"));
+Error multipleExceptions = Error.From(
+    new FileNotFoundException("settings.json"),
+    new TimeoutException("Remote service did not respond"));
 
 // Implicit conversion from string
-Error implicitError = "Something went wrong";
+Error fromString = "Something went wrong";
 
 // Implicit conversion from exception
-Error implicitException = new InvalidOperationException("Can't do that.");
+Error fromException = new InvalidOperationException("Operation not allowed");
 ```
 
-#### `Error operator +(Error left, Error right)`
-Combines multiple errors into a single error.
+#### Properties
+
+##### `ImmutableHashSet<string> Messages`
+Set of all error messages. Duplicates are collapsed using case-insensitive comparison.
 
 ```csharp
-Error emailError = Error.From("Invalid email format");
-Error passwordError = Error.From("Password too weak");
-Error combinedError = emailError + passwordError; // Error with both messages: "Invalid email format", "Password too weak"
+Error error1 = Error.From("Error A", "error a", "Error B");
+Error error2 = Error.From(new InvalidOperationException("Error C"));
+Error combined = error1 + error2;
+
+combined.Messages.Iter(m => Console.WriteLine(m));
+// Output (order not guaranteed):
+// Error A
+// Error B
+// Error C
 ```
 
-#### `ImmutableHashSet<string> Messages`
-Gets all error messages as an immutable set.
+##### `ImmutableHashSet<Exception> Exceptions`
+Set of all exceptions contained in this error.
 
 ```csharp
-Error error = Error.From("Error 1", "Error 2");
-error.Messages.Iter(message => Console.WriteLine($"Error: {message}"));
+Error error = Error.From(
+    new FileNotFoundException("missing.txt"),
+    new TimeoutException("Operation timed out"));
+
+error.Exceptions.Iter(ex => Console.WriteLine($"{ex.GetType().Name}: {ex.Message}"));
+// FileNotFoundException: missing.txt
+// TimeoutException: Operation timed out
+```
+
+#### `Error From(params string[] messages)`
+Creates an error from one or more messages.
+
+```csharp
+// Single message
+Error single = Error.From("Validation failed");
+
+// Multiple messages
+Error multiple = Error.From(
+    "Email is required",
+    "Password must be at least 8 characters",
+    "Username is already taken");
+
+// Throws if no messages provided
+Error invalid = Error.From(); // Throws ArgumentException
+```
+
+#### `Error From(params Exception[] exceptions)`
+Creates an error from one or more exceptions.
+
+```csharp
+// Single exception
+Error single = Error.From(new InvalidOperationException("Cannot process"));
+
+// Multiple exceptions
+Error multiple = Error.From(
+    new FileNotFoundException("config.json"),
+    new UnauthorizedAccessException("Access denied"),
+    new TimeoutException("Request timed out"));
+
+// Throws if no exceptions provided
+Error invalid = Error.From(); // Throws ArgumentException
 ```
 
 #### `Exception ToException()`
-Converts the error to an appropriate exception.
+Converts the error to an exception.
 
 ```csharp
-Error singleError = Error.From("Database connection failed");
-Exception singleException = singleError.ToException(); // InvalidOperationException with message "Database connection failed"
+// Single exception is preserved exactly
+Error single = Error.From(new FileNotFoundException("settings.json"));
+single.ToException(); // FileNotFoundException (original instance)
 
-Error multipleErrors = Error.From("Error 1", "Error 2");
-Exception aggregateException = multipleErrors.ToException(); // AggregateException containing multiple InvalidOperationExceptions
+// Multiple exceptions are wrapped in AggregateException
+Error multiple = Error.From(
+    new InvalidOperationException("Invalid state"),
+    new TimeoutException("Timed out"));
+multiple.ToException(); // AggregateException containing InvalidOperationException and TimeoutException
+
+// Single message becomes InvalidOperationException
+Error single = Error.From("Something went wrong");
+single.ToException(); // InvalidOperationException("Something went wrong")
+
+// Multiple messages become InvalidOperationException instances in AggregateException
+Error multiple = Error.From("Error 1", "Error 2");
+multiple.ToException(); // AggregateException(InvalidOperationException("Error 1"), InvalidOperationException("Error 2"))
+
+// Mixed messages and exceptions
+Error mixed = Error.From("Custom error") 
+            + Error.From(new TimeoutException("Timeout"));
+mixed.ToException(); // AggregateException(InvalidOperationException("Custom error"), TimeoutException("Timeout"))
 ```
 
-#### Exceptional Errors
+#### Combining Errors with `+`
+Merges two errors, combining their messages and exceptions. Duplicate messages are collapsed.
 
 ```csharp
-var fileError = Error.From(new FileNotFoundException("settings.json"));
-Exception originalException = fileError.ToException(); // The original FileNotFoundException, not a wrapped exception
+Error validation = Error.From("Invalid email", "Password too short");
+Error network = Error.From(new TimeoutException("Connection timeout"));
+Error authorization = Error.From("Unauthorized");
+
+Error combined = validation + network + authorization;
+
+combined.Messages.Iter(m => Console.WriteLine(m));
+// Invalid email
+// Password too short
+// Unauthorized
+
+combined.Exceptions.Iter(ex => Console.WriteLine(ex.GetType().Name));
+// TimeoutException
+
+// Duplicates are collapsed (case-insensitive)
+Error a = Error.From("Error message");
+Error b = Error.From("ERROR MESSAGE", "Different error");
+Error merged = a + b;
+
+merged.Messages.Count; // 2 (not 3)
+// "Error message"
+// "Different error"
+```
+
+#### Equality
+Two errors are equal if they have the same set of messages (case-insensitive) and the same set of exceptions.
+
+```csharp
+Error e1 = Error.From("Error A", "Error B");
+Error e2 = Error.From("error b", "error a"); // Case-insensitive, order doesn't matter
+e1.Equals(e2); // true
+
+Error e3 = Error.From(new InvalidOperationException("Failed"));
+Error e4 = Error.From(new InvalidOperationException("Failed"));
+e3.Equals(e4); // true (same exception types and messages)
+
+Error e5 = Error.From("Message");
+Error e6 = Error.From(new InvalidOperationException("Message"));
+e5.Equals(e6); // false (different structure - one has exception, one has message)
+```
+
+#### `string ToString()`
+Returns a formatted string with all messages and exception descriptions, sorted alphabetically.
+
+```csharp
+Error error = Error.From("Validation failed", "Invalid format")
+            + Error.From(new TimeoutException("Request timeout"));
+
+Console.WriteLine(error.ToString());
+// Invalid format
+// Validation failed
+// TimeoutException: Request timeout
 ```
 
 ---
@@ -598,7 +717,7 @@ Exception originalException = fileError.ToException(); // The original FileNotFo
 Provides extension methods for working with `IEnumerable<T>` in a functional style.
 
 #### `Option<T> Head<T>()`
-Gets the first element of the sequence as an option.
+Returns the first element as an option.
 
 ```csharp
 List<Customer> customers = GetActiveCustomers();
@@ -614,8 +733,35 @@ int[] numbers = { };
 Option<int> firstNumber = numbers.Head(); // None (instead of throwing an exception)
 ```
 
+#### `Option<T> Head<T>(Func<T, bool> predicate)`
+Returns the first element matching `predicate` as an option.
+
+```csharp
+// Safe alternative to .First(x => predicate(x)) / .Where(predicate).First()
+int[] values = { 3, 5, 8, 8, 10 };
+Option<int> firstEven = values.Head(x => x % 2 == 0); // Some(8)
+
+// When no element matches, returns None instead of throwing
+int[] odds = { 1, 3, 5 };
+Option<int> noEven = odds.Head(x => x % 2 == 0); // None
+
+// Works with (potentially) infinite sequences – short-circuits on first match
+var naturals = Enumerable.Range(1, int.MaxValue);
+Option<int> greaterThan100 = naturals.Head(x => x > 100); // Some(101)
+```
+
+Category theory perspective: this is the total (Option-returning) form of the partial `find` function. It factorizes through the `Option` (Maybe) monad to handle absence safely.
+
+Law (derivable from `Pick`):
+
+```
+source.Head(p) == source.Pick(x => p(x) ? Option.Some(x) : Option.None)
+```
+
+This makes `Head(predicate)` a convenience wrapper over a common `Pick` pattern while preserving laziness and short-circuiting behavior.
+
 #### `Option<T> SingleOrNone<T>()`
-Returns the single element of the sequence as an option.
+Returns the single element as an option.
 
 ```csharp
 // Safe alternative to .Single()
@@ -639,7 +785,7 @@ Option<int> alsoNone = multiple.SingleOrNone(); // None (multiple elements)
 ```
 
 #### `IEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
-Filters and transforms elements using an option-returning selector.
+Filters and transforms elements using `selector`.
 
 ```csharp
 // Parse valid integers from mixed input
@@ -651,7 +797,7 @@ validNumbers.Iter(number => Console.WriteLine($"Valid number: {number}")); // Ou
 ```
 
 #### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, ValueTask<Option<T2>>> selector)`
-Filters and transforms elements using an async option-returning selector.
+Asynchronously filters and transforms elements using `selector`.
 
 ```csharp
 // Process files asynchronously, keeping only successful operations
@@ -674,7 +820,7 @@ await fileContents.IterTask(async content =>
 ```
 
 #### `Option<T2> Pick<T, T2>(Func<T, Option<T2>> selector)`
-Finds the first element that produces a Some value when transformed.
+Returns the first element that produces Some when transformed by `selector`.
 
 ```csharp
 // Find the first valid configuration file
@@ -694,7 +840,7 @@ Option<int> firstEven = numbers.Pick(n =>
 ```
 
 #### `Result<ImmutableArray<T2>> Traverse<T, T2>(Func<T, Result<T2>> selector, CancellationToken cancellationToken)`
-Applies an operation returning a `Result<T2>` to each element, aggregates successes or combines errors.
+Applies `selector` to each element, collecting successes or aggregating errors.
 
 ```csharp
 // Validate all user inputs - succeeds only if all are valid
@@ -713,7 +859,7 @@ Result<ImmutableArray<Email>> failedValidation = mixedInputs.Traverse(
 ```
 
 #### `Option<ImmutableArray<T2>> Traverse<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
-Applies an operation returning an `Option<T2>` to each element, returning `Some` if all succeed or `None` if any fail.
+Applies `selector` to each element, succeeding only if all elements succeed.
 
 ```csharp
 // Parse all numbers - succeeds only if all are valid
@@ -732,7 +878,7 @@ Option<ImmutableArray<int>> failedParsing = mixedInputs.Traverse(
 ```
 
 #### `(ImmutableArray<T1>, ImmutableArray<T2>) Unzip<T1, T2>()`
-Separates an enumerable of tuples into a tuple of immutable arrays. This is the inverse operation of `Zip`.
+Separates tuples into two immutable arrays. Inverse of `Zip`.
 
 ```csharp
 // Split coordinate pairs into separate x and y collections
@@ -748,15 +894,10 @@ var (names, ages) = users.Unzip();
 
 Console.WriteLine($"Names: {string.Join(", ", names)}");     // Names: Alice, Bob, Charlie
 Console.WriteLine($"Ages: {string.Join(", ", ages)}");       // Ages: 25, 30, 35
-
-// Works with any tuple types
-var dataPoints = new[] { ("A", 1.5), ("B", 2.0), ("C", 3.5) };
-var (labels, values) = dataPoints.Unzip();
-// labels: ["A", "B", "C"], values: [1.5, 2.0, 3.5]
 ```
 
 #### `void Iter<T>(Action<T> action, CancellationToken cancellationToken = default)`
-Executes an action on each element sequentially.
+Executes `action` on each element sequentially.
 
 ```csharp
 List<ImageFile> images = GetImagesToProcess();
@@ -772,7 +913,7 @@ images.Iter(
 ```
 
 #### `void IterParallel<T>(Action<T> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
-Executes an action on each element in parallel.
+Executes `action` on each element in parallel.
 
 ```csharp
 List<ImageFile> images = GetImagesToProcess();
@@ -791,7 +932,7 @@ images.IterParallel(
 ```
 
 #### `ValueTask IterTask<T>(Func<T, ValueTask> action, CancellationToken cancellationToken = default)`
-Executes an async action on each element sequentially.
+Asynchronously executes `action` on each element sequentially.
 
 ```csharp
 List<EmailAddress> recipients = GetEmailRecipients();
@@ -807,7 +948,7 @@ await recipients.IterTask(
 ```
 
 #### `ValueTask IterTaskParallel<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
-Executes an async action on each element in parallel.
+Asynchronously executes `action` on each element in parallel.
 
 ```csharp
 List<EmailAddress> recipients = GetEmailRecipients();
@@ -826,20 +967,20 @@ await recipients.IterTaskParallel(
 ```
 
 #### `IEnumerable<T> Tap<T>(Action<T> action)`
-Executes a side effect action on each element as it's enumerated, returning the original enumerable unchanged. Useful for debugging, logging, or other side effects in LINQ chains without affecting the data flow.
+Executes `action` on each element as it's enumerated, returning the original sequence unchanged.
 
 ```csharp
-// Debugging and logging
+// Debugging and logging in LINQ chains
 List<User> users = GetUsers()
     .Where(user => user.IsActive)
-    .Tap(user => Console.WriteLine($"Processing user: {user.Name}")) // Log processing
+    .Tap(user => Console.WriteLine($"Processing user: {user.Name}"))
     .Where(user => user.HasValidEmail)
-    .Tap(user => logger.LogInfo($"Valid user: {user.Id}")) // Additional logging
+    .Tap(user => Console.WriteLine($"Valid user: {user.Id}"))
     .ToList();
 
-// Chain multiple taps for different concerns
+// Multiple taps for different concerns
 var processedOrders = orders
-    .Tap(order => auditLogger.Log($"Processing order: {order.Id}"))
+    .Tap(order => Console.WriteLine($"Processing order: {order.Id}"))
     .Where(order => order.IsValid)
     .Tap(order => metrics.IncrementCounter("valid_orders"))
     .Select(order => EnrichOrder(order));
@@ -852,7 +993,7 @@ var processedOrders = orders
 Provides extension methods for working with `IAsyncEnumerable<T>` in a functional style.
 
 #### `ValueTask<Option<T>> Head<T>(CancellationToken cancellationToken)`
-Gets the first element of the async sequence as an option.
+Returns the first element of the async sequence as an option.
 
 ```csharp
 IAsyncEnumerable<LogEntry> logStream = GetLogStreamAsync();
@@ -865,7 +1006,7 @@ firstEntry.Match(
 ```
 
 #### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, Option<T2>> selector)`
-Filters and transforms async elements using an option-returning selector.
+Filters and transforms async elements using `selector`.
 
 ```csharp
 // Filter and transform streaming data
@@ -885,7 +1026,7 @@ await validEntries.IterTask(async entry => {
 ```
 
 #### `IAsyncEnumerable<T2> Choose<T, T2>(Func<T, ValueTask<Option<T2>>> selector)`
-Filters and transforms async elements using an async option-returning selector.
+Asynchronously filters and transforms async elements using `selector`.
 
 ```csharp
 // Process streaming data with async validation
@@ -909,7 +1050,7 @@ await validData.IterTask(async data =>
 ```
 
 #### `ValueTask<Option<T2>> Pick<T, T2>(Func<T, Option<T2>> selector, CancellationToken cancellationToken)`
-Finds the first async element that produces a Some value when transformed.
+Returns the first async element that produces Some when transformed by `selector`.
 
 ```csharp
 // Find the first valid data record in a stream
@@ -922,7 +1063,7 @@ Option<DataRecord> firstValid = await dataStream.Pick(line =>
 ```
 
 #### `ValueTask<Result<ImmutableArray<T2>>> Traverse<T, T2>(Func<T, ValueTask<Result<T2>>> selector, CancellationToken cancellationToken)`
-Applies an async operation returning `ValueTask<Result<T2>>` to each element, aggregates successes or combines errors.
+Asynchronously applies `selector` to each element, collecting successes or aggregating errors.
 
 ```csharp
 // Validate file uploads asynchronously
@@ -940,7 +1081,7 @@ validationResult.Match(
 ```
 
 #### `ValueTask<Option<ImmutableArray<T2>>> Traverse<T, T2>(Func<T, ValueTask<Option<T2>>> selector, CancellationToken cancellationToken)`
-Applies an async operation returning `ValueTask<Option<T2>>` to each element, returning `Some` if all succeed or `None` if any fail.
+Asynchronously applies `selector` to each element, succeeding only if all elements succeed.
 
 ```csharp
 // Process file downloads asynchronously - succeeds only if all downloads complete
@@ -958,7 +1099,7 @@ downloadResult.Match(
 ```
 
 #### `ValueTask<(ImmutableArray<T1>, ImmutableArray<T2>)> Unzip<T1, T2>(CancellationToken cancellationToken)`
-Asynchronously separates an async enumerable of tuples into a tuple of immutable arrays. This is the async version of the synchronous Unzip operation.
+Asynchronously separates tuples into two immutable arrays. Async inverse of `Zip`.
 
 ```csharp
 // Process streaming coordinate data
@@ -979,7 +1120,7 @@ var (labels, values) = await dataStream.Unzip(cancellationToken);
 ```
 
 #### `ValueTask IterTask<T>(Func<T, ValueTask> action, CancellationToken cancellationToken = default)`
-Executes an async action on each element sequentially.
+Asynchronously executes `action` on each element sequentially.
 
 ```csharp
 IAsyncEnumerable<DatabaseRecord> records = GetRecordsAsync();
@@ -995,7 +1136,7 @@ await records.IterTask(
 ```
 
 #### `ValueTask IterTaskParallel<T>(Func<T, ValueTask> action, Option<int> maxDegreeOfParallelism, CancellationToken cancellationToken = default)`
-Executes an async action on each element in parallel.
+Asynchronously executes `action` on each element in parallel.
 
 ```csharp
 IAsyncEnumerable<DatabaseRecord> records = GetRecordsAsync();
@@ -1014,7 +1155,7 @@ await records.IterTaskParallel(
 ```
 
 #### `IAsyncEnumerable<T> Tap<T>(Action<T> action)`
-Executes a side effect action on each element as it's enumerated, returning the original async enumerable unchanged. Useful for debugging, logging, or other side effects in async LINQ chains without affecting the data flow.
+Executes `action` on each async element as it's enumerated, returning the original sequence unchanged.
 
 ```csharp
 // Sync logging in async streams
@@ -1032,18 +1173,17 @@ await foreach (var order in processedOrders)
 ```
 
 #### `IAsyncEnumerable<T> TapTask<T>(Func<T, ValueTask> action)`
-Executes an async side effect action on each element as it's enumerated, returning the original async enumerable unchanged. Useful for debugging, logging, or other async side effects in async LINQ chains without affecting the data flow.
+Asynchronously executes `action` on each async element as it's enumerated, returning the original sequence unchanged.
 
 ```csharp
-// Async logging and monitoring
+// Async logging and side effects
 IAsyncEnumerable<Order> processedOrders = orderStream
     .Where(order => order.RequiresValidation)
-    .TapTask(async order => await auditLogger.LogAsync($"Validating order: {order.Id}")) // Async logging
+    .TapTask(async order => await LogAsync($"Validating order: {order.Id}"))
     .Where(order => order.IsValid)
-    .TapTask(async order => await notificationService.NotifyAsync(order.CustomerId)) // Async notifications
+    .TapTask(async order => await NotifyCustomerAsync(order.CustomerId))
     .Select(order => EnrichOrder(order));
 
-// Chain sync and async taps
 await foreach (var order in processedOrders)
 {
     await ProcessOrderAsync(order);
@@ -1056,7 +1196,7 @@ await foreach (var order in processedOrders)
 Provides extension methods for safe dictionary operations.
 
 #### `Option<TValue> Find<TKey, TValue>(TKey key)`
-Safely retrieves a value from a dictionary.
+Returns the value for `key` as an option.
 
 ```csharp
 // Safe configuration lookup with fallback

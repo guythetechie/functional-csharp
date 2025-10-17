@@ -2,132 +2,113 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 
 namespace common;
 
 #pragma warning disable CA1716 // Identifiers should not match keywords
 /// <summary>
-/// Represents an error containing one or more messages.
+/// Represents an error containing messages and/or exceptions. Messages are case-insensitive and deduplicated.
 /// </summary>
-public record Error
+public sealed record Error
 #pragma warning restore CA1716 // Identifiers should not match keywords
 {
-    private readonly ImmutableHashSet<string> messages;
-
-    protected Error(IEnumerable<string> messages)
-    {
-        this.messages = [.. messages];
-    }
+    /// <summary>
+    /// Case-insensitive set of error messages.
+    /// </summary>
+    public ImmutableHashSet<string> Messages { get; }
 
     /// <summary>
-    /// Gets all error messages as an immutable set.
+    /// Set of all exceptions contained in this error.
     /// </summary>
-    public ImmutableHashSet<string> Messages => messages;
+    public ImmutableHashSet<Exception> Exceptions { get; }
+
+    private Error(IEnumerable<string> messages, IEnumerable<Exception> exceptions)
+    {
+        Messages = messages.ToImmutableHashSet(StringComparer.OrdinalIgnoreCase);
+        Exceptions = [.. exceptions];
+
+        if (Messages.Count == 0 && Exceptions.Count == 0)
+        {
+            throw new ArgumentException("Error must have at least one message or exception.");
+        }
+    }
 
     /// <summary>
     /// Creates an error from one or more messages.
     /// </summary>
-    /// <param name="messages">The error messages.</param>
-    /// <returns>An error containing the specified messages.</returns>
+    /// <exception cref="ArgumentException">Thrown when no messages are provided.</exception>
     public static Error From(params string[] messages) =>
-        new(messages);
+        messages.Length > 0
+            ? new(messages, [])
+            : throw new ArgumentException("At least one message required.", nameof(messages));
 
     /// <summary>
-    /// Creates an error from an exception.
+    /// Creates an error from one or more exceptions.
     /// </summary>
-    /// <param name="exception">The exception to wrap.</param>
-    /// <returns>An exceptional error containing the exception.</returns>
-    public static Error From(Exception exception) =>
-        new Exceptional(exception);
+    /// <exception cref="ArgumentException">Thrown when no exceptions are provided.</exception>
+    public static Error From(params Exception[] exceptions) =>
+        exceptions.Length > 0
+            ? new([], exceptions)
+            : throw new ArgumentException("At least one exception required.", nameof(exceptions));
 
     /// <summary>
-    /// Converts the error to an appropriate exception.
+    /// Converts the error to an exception.
     /// </summary>
-    /// <returns>An exception representing this error.</returns>
-    public virtual Exception ToException() =>
-        messages.ToArray() switch
+    /// <returns>
+    /// A single exception is returned as-is. Multiple exceptions are wrapped in an <see cref="AggregateException"/>.
+    /// Messages are converted to <see cref="InvalidOperationException"/> instances.
+    /// </returns>
+    public Exception ToException() =>
+        (Messages.Count, Exceptions.Count) switch
         {
-            [var message] => new InvalidOperationException(message),
-            _ => new AggregateException(messages.Select(message => new InvalidOperationException(message)))
+            (0, 1) => Exceptions.First(),
+            (0, _) => new AggregateException(Exceptions),
+            (1, 0) => new InvalidOperationException(Messages.First()),
+            _ => new AggregateException([.. Messages.Select(message => new InvalidOperationException(message)),
+                                         .. Exceptions])
         };
 
-    public override string ToString() =>
-        messages.ToArray() switch
-        {
-            [var message] => message,
-            _ => string.Join("; ", messages)
-        };
+    /// <summary>
+    /// Returns a string representation of the error, listing all messages and exceptions.
+    /// </summary>
+    public override string ToString()
+    {
+        var builder = new StringBuilder();
+
+        Messages.Order().Iter(message => builder.AppendLine(message));
+
+        Exceptions.Select(exception => $"{exception.GetType().Name}: {exception.Message}")
+                  .Order()
+                  .Iter(text => builder.AppendLine(text)); 
+
+        return builder.ToString().Trim();
+    }
 
     /// <summary>
-    /// Implicitly converts a string to an error.
+    /// Converts a message to an <see cref="Error"./>.
     /// </summary>
     public static implicit operator Error(string message) =>
         From(message);
 
     /// <summary>
-    /// Implicitly converts an exception to an error.
+    /// Converts an exception to an <see cref="Error"/>.
     /// </summary>
     public static implicit operator Error(Exception exception) =>
         From(exception);
 
     /// <summary>
-    /// Combines two errors into a single error.
+    /// Combines two errors.
     /// </summary>
-    /// <param name="left">The first error.</param>
-    /// <param name="right">The second error.</param>
-    /// <returns>An error containing messages from both errors.</returns>
     public static Error operator +(Error left, Error right) =>
-        (left.messages, right.messages) switch
-        {
-            ({ Count: 0 }, _) => right,
-            (_, { Count: 0 }) => left,
-            _ => new(left.messages.Union(right.messages))
-        };
+        new([.. left.Messages, .. right.Messages],
+            [.. left.Exceptions, .. right.Exceptions]);
 
-    public virtual bool Equals(Error? other) =>
-        (this, other) switch
-        {
-            (_, null) => false,
-            ({ messages.Count: 0 }, { messages.Count: 0 }) => true,
-            _ => messages.SetEquals(other.messages)
-        };
+    public bool Equals(Error? other) =>
+        Messages.SetEquals(other?.Messages ?? [])
+        && Exceptions.SetEquals(other?.Exceptions ?? []);
 
     public override int GetHashCode() =>
-        messages.Count switch
-        {
-            0 => 0,
-            _ => messages.Aggregate(0, (hash, message) => HashCode.Combine(hash, message.GetHashCode()))
-        };
-
-    /// <summary>
-    /// Represents an error that wraps an exception.
-    /// </summary>
-    public sealed record Exceptional : Error
-    {
-        internal Exceptional(Exception exception) : base([exception.Message])
-        {
-            Exception = exception;
-        }
-
-        /// <summary>
-        /// Gets the wrapped exception.
-        /// </summary>
-        public Exception Exception { get; }
-
-        /// <summary>
-        /// Returns the original wrapped exception.
-        /// </summary>
-        /// <returns>The original exception.</returns>
-        public override Exception ToException() => Exception;
-
-        public bool Equals(Error.Exceptional? other) =>
-            (this, other) switch
-            {
-                (_, null) => false,
-                _ => Exception.Equals(other.Exception)
-            };
-
-        public override int GetHashCode() =>
-            Exception.GetHashCode();
-    }
+        HashCode.Combine(Messages.Aggregate(Messages.Count, (hash, message) => hash ^ StringComparer.OrdinalIgnoreCase.GetHashCode(message)),
+                         Exceptions.Aggregate(Exceptions.Count, (hash, exception) => hash ^ exception.GetHashCode()));
 }
