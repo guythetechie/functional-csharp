@@ -147,7 +147,7 @@ public static class Option
                            async () => await ValueTask.FromResult(Option<T2>.None()));
 
     /// <summary>
-    /// Chains option-returning operations (monadic bind).
+    /// Applies <paramref name="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>f(value)</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static Option<T2> Bind<T, T2>(this Option<T> option, Func<T, Option<T2>> f) =>
@@ -155,7 +155,7 @@ public static class Option
                      () => None);
 
     /// <summary>
-    /// Asynchronously chains option-returning operations (monadic bind).
+    /// Applies <paramref name="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>await f(value)</c> if Some, otherwise <see cref="common.None"/>.</returns>
     public static async ValueTask<Option<T2>> BindTask<T, T2>(this Option<T> option, Func<T, ValueTask<Option<T2>>> f) =>

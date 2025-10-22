@@ -140,7 +140,7 @@ public static class Result
                      error => Error<T>(f(error)));
 
     /// <summary>
-    /// Chains result-returning operations (monadic bind).
+    /// Applies <paramref name="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>f(value)</c> if successful, otherwise the original error.</returns>
     public static Result<T2> Bind<T, T2>(this Result<T> result, Func<T, Result<T2>> f) =>
@@ -148,7 +148,7 @@ public static class Result
                      error => Error<T2>(error));
 
     /// <summary>
-    /// Asynchronously chains result-returning operations (monadic bind).
+    /// Applies <paramref="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>await f(value)</c> if successful, otherwise the original error.</returns>
     public static async ValueTask<Result<T2>> BindTask<T, T2>(this Result<T> result, Func<T, ValueTask<Result<T2>>> f) =>

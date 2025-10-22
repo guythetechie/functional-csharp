@@ -85,7 +85,7 @@ Option<UserProfile> profile = await userId.MapTask(async id =>
 ```
 
 #### `Option<T2> Bind<T2>(Func<T, Option<T2>> binder)`
-Chains option-returning operations (monadic bind).
+Applies `binder` and flattens the result.
 
 ```csharp
 Option<string> userId = Option.Some("123");
@@ -100,7 +100,7 @@ static Option<User> FindUserById(string id) =>
 ```
 
 #### `ValueTask<Option<T2>> BindTask<T2>(Func<T, ValueTask<Option<T2>>> asyncBinder)`
-Asynchronously chains option-returning operations (monadic bind).
+Applies `asyncBinder` and flattens the result.
 
 ```csharp
 Option<string> userId = Option.Some("123");
@@ -289,7 +289,7 @@ Result<ConfigFile> contextualError = configResult.MapError(error =>
 ```
 
 #### `Result<T2> Bind<T2>(Func<T, Result<T2>> binder)`
-Chains result-returning operations (monadic bind).
+Applies `binder` and flattens the result.
 
 ```csharp
 // Chain validation and processing steps
@@ -300,7 +300,7 @@ Result<Payment> paymentResult =
 ```
 
 #### `ValueTask<Result<T2>> BindTask<T2>(Func<T, ValueTask<Result<T2>>> asyncBinder)`
-Asynchronously chains result-returning operations (monadic bind).
+Applies `asyncBinder` and flattens the result.
 
 ```csharp
 Result<Order> orderResult = ValidateOrder(orderRequest);
@@ -458,7 +458,7 @@ Either<ErrorMessage, string> errorResult = errorCase.Map(data => data.FullName);
 ```
 
 #### `Either<TLeft, TRight2> Bind<TRight2>(Func<TRight, Either<TLeft, TRight2>> binder)`
-Chains either-returning operations (monadic bind).
+Applies `binder` and flattens the result.
 
 ```csharp
 // Chain operations that return Either results

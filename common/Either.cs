@@ -130,7 +130,7 @@ public static class Either
                      right => Right<TLeft, TRight2>(f(right)));
 
     /// <summary>
-    /// Chains either-returning operations (monadic bind).
+    /// Applies <paramref="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>f(right)</c> if Right, otherwise the original Left.</returns>
     public static Either<TLeft, TRight2> Bind<TLeft, TRight, TRight2>(this Either<TLeft, TRight> either, Func<TRight, Either<TLeft, TRight2>> f) =>
