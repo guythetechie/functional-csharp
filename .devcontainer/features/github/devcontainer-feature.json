@@ -1,0 +1,27 @@
+{
+    "id": "github",
+    "version": "1.0.0",
+    "name": "github",
+    "dependsOn": {
+        "ghcr.io/devcontainers/features/copilot-cli:1": {}
+    },
+    "customizations": {
+        "vscode": {
+            "mcp": {
+                "servers": {
+                    "github": {
+                        "type": "http",
+                        "url": "https://api.githubcopilot.com/mcp/"
+                    }
+                }
+            }
+        }
+    },
+    "mounts": [
+        {
+            "source": "${localEnv:HOME}${localEnv:USERPROFILE}/.copilot",
+            "target": "/home/vscode/.copilot",
+            "type": "bind"
+        }
+    ]
+}

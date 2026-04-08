@@ -1,91 +1,202 @@
-using common;
 using CsCheck;
-using FluentAssertions;
 using System;
+using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading.Tasks;
-using Xunit;
 
 namespace common.tests;
 
-public class OptionTests
+file static class Common
 {
-    [Fact]
-    public void Some_returns_an_option_in_the_some_state()
+    public static Gen<Option<object>> SomeOptionGenerator { get; } =
+        from x in Generator.Object
+        select Option.Some(x);
+
+    public static Option<object> NoneOption { get; } = Option.None;
+
+    public static Gen<Option<object>> OptionGenerator { get; } =
+        Gen.Frequency((9, SomeOptionGenerator),
+                      (1, Gen.Const(NoneOption)));
+
+    public static Gen<Func<object, Option<object>>> ObjectToOptionGenerator { get; } =
+        from predicate in Generator.ObjectPredicate
+        from f in Generator.ObjectToObject
+        select new Func<object, Option<object>>(x => predicate(x)
+                                                        ? Option.Some(f(x))
+                                                        : Option.None);
+}
+
+public class None_ToString_Tests
+{
+    [Test]
+    public async Task Returns_None()
     {
-        var gen = Gen.Int;
+        // Arrange
+        var none = new None();
 
-        gen.Sample(value =>
-        {
-            var option = Option.Some(value);
-
-            // Assert
-            option.Should().BeSome().Which.Should().Be(value);
-            option.IsNone.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void None_returns_an_option_in_the_none_state()
-    {
-        var option = Option<int>.None();
+        // Act
+        var result = none.ToString();
 
         // Assert
-        option.Should().BeNone();
-        option.IsSome.Should().BeFalse();
+        await Assert.That(result)
+                    .IsEqualTo("None");
     }
+}
 
-    [Fact]
-    public void Equality_is_reflexive()
+public class None_GetHashCode_Tests
+{
+    [Test]
+    public async Task Returns_zero()
     {
-        var gen = Generator.Option;
+        // Arrange
+        var none = new None();
 
-        gen.Sample(monad =>
+        // Act
+        var hashCode = none.GetHashCode();
+
+        // Assert
+        await Assert.That(hashCode)
+                    .IsEqualTo(0);
+    }
+}
+
+public class SomeT_ToString_Tests
+{
+    [Test]
+    public async Task Returns_Some_with_value()
+    {
+        var gen = Generator.Object;
+
+        await gen.SampleAsync(async value =>
         {
+            // Arrange
+            var some = new Some<object>(value);
+
+            // Act
+            var result = some.ToString();
+
             // Assert
-            monad.Equals(monad).Should().BeTrue();
-#pragma warning disable CS1718 // Comparison made to same variable
-            (monad == monad).Should().BeTrue();
-#pragma warning restore CS1718 // Comparison made to same variable
+            await Assert.That(result)
+                        .Contains("Some")
+                        .And
+                        .Contains(value.ToString()!);
+        });
+    }
+}
+
+public class OptionT_None_ImplicitOperator_Tests
+{
+    [Test]
+    public async Task Implicitly_converts_None_to_an_option_in_the_none_state()
+    {
+        // Assert
+        await Assert.That(Common.NoneOption)
+                    .IsNone();
+    }
+}
+
+public class OptionT_ToString_Tests
+{
+    [Test]
+    public async Task Some_returns_Some_with_value()
+    {
+        var gen = Generator.Object;
+
+        await gen.SampleAsync(async value =>
+        {
+            // Arrange
+            var some = new Some<object>(value);
+            var option = new Option<object>(some);
+
+            // Act
+            var result = option.ToString();
+
+            // Assert
+            await Assert.That(result)
+                        .Contains("Some")
+                        .And
+                        .Contains(value.ToString()!);
         });
     }
 
-    [Fact]
-    public void Equality_is_symmetric()
+    [Test]
+    public async Task None_returns_None()
     {
-        var gen = from value1 in Gen.Int
-                  from option1 in Gen.OneOfConst(Option.Some(value1),
-                                                 Option.None)
-                  from value2 in Gen.OneOf(Gen.Const(value1), Gen.Int)
-                  from option2 in Gen.OneOfConst(Option.Some(value2),
-                                                 Option.None)
+        // Arrange
+        var none = new None();
+        var option = new Option<object>(none);
+
+        // Act
+        var result = option.ToString();
+
+        // Assert
+        await Assert.That(result)
+                    .IsEqualTo("None");
+    }
+}
+
+public class OptionT_Equality_Tests
+{
+    [Test]
+    public async Task Equality_is_reflexive()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Assert
+            await Assert.That(option.Equals(option))
+                        .IsTrue();
+
+#pragma warning disable CS1718 // Comparison made to same variable
+            await Assert.That(option == option)
+#pragma warning restore CS1718 // Comparison made to same variable
+                        .IsTrue();
+        });
+    }
+
+    [Test]
+    public async Task Equality_is_symmetric()
+    {
+        var gen = from x1 in Generator.Object
+                  from x2 in Generator.Object
+                  let optionGenerator =
+                    Gen.OneOfConst(Option.Some(x1),
+                                   Option.Some(x2),
+                                   Option.None)
+                  from option1 in optionGenerator
+                  from option2 in optionGenerator
                   select (option1, option2);
 
-        gen.Sample(tuple =>
+        await gen.SampleAsync(async tuple =>
         {
             // Arrange
             var (option1, option2) = tuple;
 
             // Assert
-            (option1.Equals(option2)).Should().Be(option2.Equals(option1));
-            (option1 == option2).Should().Be(option2 == option1);
+            await Assert.That(option1.Equals(option2))
+                        .IsEqualTo(option2.Equals(option1));
+
+            await Assert.That(option1 == option2)
+                        .IsEqualTo(option2 == option1);
         });
     }
 
-    [Fact]
-    public void Equality_is_transitive()
+    [Test]
+    public async Task Equality_is_transitive()
     {
-        var gen = from value1 in Gen.Int
-                  from option1 in Gen.OneOfConst(Option.Some(value1),
-                                                 Option.None)
-                  from value2 in Gen.OneOf(Gen.Const(value1), Gen.Int)
-                  from option2 in Gen.OneOfConst(Option.Some(value2),
-                                                 Option.None)
-                  from value3 in Gen.OneOf(Gen.Const(value1), Gen.Const(value2), Gen.Int)
-                  from option3 in Gen.OneOfConst(Option.Some(value3),
-                                                 Option.None)
+        var gen = from x1 in Generator.Object
+                  from x2 in Generator.Object
+                  let optionGenerator =
+                    Gen.OneOfConst(Option.Some(x1),
+                                   Option.Some(x2),
+                                   Option.None)
+                  from option1 in optionGenerator
+                  from option2 in optionGenerator
+                  from option3 in optionGenerator
                   select (option1, option2, option3);
 
-        gen.Sample(tuple =>
+        await gen.SampleAsync(async tuple =>
         {
             // Arrange
             var (option1, option2, option3) = tuple;
@@ -93,716 +204,1288 @@ public class OptionTests
             // Assert
             if (option1.Equals(option2) && option2.Equals(option3))
             {
-                option1.Equals(option3).Should().BeTrue();
-                (option1 == option3).Should().BeTrue();
+                await Assert.That(option1.Equals(option3))
+                            .IsTrue();
+
+                await Assert.That(option1 == option3)
+                            .IsTrue();
             }
         });
     }
+}
 
-    [Fact]
-    public void Somes_with_equal_values_are_equal()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            // Arrange
-            var option1 = Option.Some(value);
-            var option2 = Option.Some(value);
-
-            // Assert
-            option1.Equals(option2).Should().BeTrue();
-            (option1 == option2).Should().BeTrue();
-            option1.GetHashCode().Should().Be(option2.GetHashCode());
-        });
-    }
-
-    [Fact]
-    public void Somes_with_different_values_are_not_equal()
-    {
-        var gen = from x in Gen.Int
-                  from y in Gen.Int
-                  where x != y
-                  select (x, y);
-
-        gen.Sample(pair =>
-        {
-            // Arrange
-            var (x, y) = pair;
-            var option1 = Option.Some(x);
-            var option2 = Option.Some(y);
-
-            // Assert
-            option1.Equals(option2).Should().BeFalse();
-            (option1 != option2).Should().BeTrue();
-        });
-    }
-
-    [Fact]
-    public void Nones_are_equal()
+public class Option_UnionType_Tests()
+{
+    [Test]
+    public async Task Has_Union_attribute()
     {
         // Arrange
-        var none1 = Option<int>.None();
-        var none2 = Option<int>.None();
+        var optionType = typeof(Option<>);
 
-        // Assert
-        none1.Equals(none2).Should().BeTrue();
-        (none1 == none2).Should().BeTrue();
-        none1.GetHashCode().Should().Be(none2.GetHashCode());
-    }
-
-    [Fact]
-    public void Somes_never_equal_nones()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            // Arrange
-            var some = Option.Some(value);
-            var none = Option<int>.None();
-
-            // Assert
-            some.Equals(none).Should().BeFalse();
-            (some == none).Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Can_implicitly_convert_value_to_option()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            // Act
-            Option<int> option = value;
-
-            // Assert
-            option.Should().BeSome().Which.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Can_implicitly_convert_none_to_option()
-    {
         // Act
-        Option<int> option = Option.None;
+        var unionAttributes = optionType.GetCustomAttributes(typeof(UnionAttribute), inherit: false);
 
         // Assert
-        option.Should().BeNone();
+        await Assert.That(unionAttributes)
+                    .IsNotEmpty();
     }
 
-    [Fact]
-    public void ToString_with_some_contains_value()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            var option = Option.Some(value);
-
-            option.ToString().Should().Contain(value.ToString());
-        });
-    }
-
-    [Fact]
-    public void ToString_with_none_displays_none()
-    {
-        var option = Option<int>.None();
-
-        option.ToString().Should().Be("None");
-    }
-
-    [Fact]
-    public void Match_with_some_returns_some_function()
-    {
-        var gen = from x in Gen.Int
-                  from f in Generator.IntToString
-                  select (x, f);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (x, f) = tuple;
-            var monad = Option.Some(x);
-
-            var noneFunctionRan = false;
-            string g()
-            {
-                noneFunctionRan = true;
-                return string.Empty;
-            }
-
-            // Act
-            var result = monad.Match(f, g);
-
-            // Assert
-            result.Should().Be(f(x));
-            noneFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_none_returns_default()
-    {
-        var gen = from x in Gen.String
-                  select (Func<string>)(() => x);
-
-        gen.Sample(g =>
-        {
-            // Arrange
-            var monad = Option<int>.None();
-
-            var someFunctionRan = false;
-            string f(int _)
-            {
-                someFunctionRan = true;
-                return string.Empty;
-            }
-
-            // Act
-            var result = monad.Match(f, g);
-
-            // Assert
-            result.Should().Be(g());
-            someFunctionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_some_executes_some_action()
-    {
-        var gen = from x in Gen.Int
-                  from f1 in Generator.IntToString
-                  select (x, f1);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (x, f1) = tuple;
-            var monad = Option.Some(x);
-
-            var actionedValue = string.Empty;
-            void f(int value) => actionedValue += f1(value);
-
-            bool noneActionRan = false;
-            void g() => noneActionRan = true;
-
-            // Act
-            monad.Match(f, g);
-
-            // Assert
-            actionedValue.Should().Be(f1(x));
-            noneActionRan.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void Match_with_none_executes_none_action()
+    [Test]
+    public async Task Has_correct_constructor_for_Some_case()
     {
         // Arrange
-        var monad = Option<int>.None();
-
-        bool someActionRan = false;
-        void f(int _) => someActionRan = true;
-
-        int noneCounter = 0;
-        void g() => noneCounter++;
+        var constructors = typeof(Option<>).GetConstructors();
 
         // Act
-        monad.Match(f, g);
+        var someConstructors =
+            constructors.Where(constructor => constructor.GetParameters() is [var parameter]
+                                              && parameter.ParameterType.IsGenericType
+                                              && parameter.ParameterType.GetGenericTypeDefinition() == typeof(Some<>));
 
         // Assert
-        someActionRan.Should().BeFalse();
-        noneCounter.Should().Be(1);
+        await Assert.That(someConstructors)
+                    .IsNotEmpty();
     }
 
-    [Fact]
-    public void Option_satisfies_monad_left_identity()
+    [Test]
+    public async Task Has_correct_constructor_for_None_case()
     {
-        var gen = from x in Gen.Int
-                  from f in Generator.IntToStringOption
-                  select (x, f);
+        // Arrange
+        var constructors = typeof(Option<>).GetConstructors();
 
-        gen.Sample(tuple =>
+        // Act
+        var noneConstructors =
+            constructors.Where(constructor => constructor.GetParameters() is [var parameter]
+                                              && parameter.ParameterType == typeof(None));
+
+        // Assert
+        await Assert.That(noneConstructors)
+                    .IsNotEmpty();
+    }
+
+    [Test]
+    public async Task Has_correct_Value_property()
+    {
+        // Arrange
+        var optionType = typeof(Option<>);
+
+        // Act
+        var valueProperty = optionType.GetProperties()
+                                      .Where(property => property.Name == "Value"
+                                                         && property.PropertyType == typeof(object)
+                                                         && property.GetGetMethod() is { IsPublic: true });
+        // Assert
+        await Assert.That(valueProperty)
+                    .IsNotEmpty();
+    }
+
+    [Test]
+    public async Task Satisfies_soundness_behavioral_rule()
+    {
+        var gen = Gen.Frequency((9, Common.OptionGenerator),
+                                (1, Gen.Const(new Option<object>(new None()))),
+                                (1, Gen.Const(new Option<object>(null!))));
+
+        await gen.SampleAsync(async option =>
         {
-            // Arrange
-            var (x, f) = tuple;
-            var monad = Option.Some(x);
-
             // Act
-            var result = monad.Bind(f);
+            var value = option.Value;
 
             // Assert
-            result.Should().Be(f(x));
+            await Assert.That(value)
+                        .IsAssignableTo<None>()
+                        .Or
+                        .IsAssignableTo<Some<object>>()
+                        .Or
+                        .IsNull();
         });
     }
 
-    [Fact]
-    public void Option_satisfies_monad_right_identity()
+    [Test]
+    public async Task Satisfies_stability_behavioral_rule_for_None_case()
     {
-        var gen = Generator.Option;
+        // Arrange
+        var option = new Option<object>(new None());
 
-        gen.Sample(option =>
-        {
-            var result = option.Bind(Option.Some);
+        // Act
+        var value = option.Value;
 
-            result.Should().Be(option);
-        });
+        // Assert
+        await Assert.That(value)
+                    .IsAssignableTo<None>();
     }
 
-    [Fact]
-    public void Option_satisfies_monad_associativity()
+    [Test]
+    public async Task Satisfies_stability_behavioral_rule_for_Some_case()
     {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToStringOption
-                  from g in Generator.StringToIntOption
-                  select (monad, f, g);
+        var gen = from x in Generator.Object
+                  let some = new Some<object>(x)
+                  select new Option<object>(some);
 
-        gen.Sample(tuple =>
+        await gen.SampleAsync(async option =>
         {
-            // Arrange
-            var (monad, f, g) = tuple;
-
             // Act
-            var path1 = monad.Bind(f)
-                             .Bind(g);
-
-            var path2 = monad.Bind(x => f(x).Bind(g));
+            var value = option.Value;
 
             // Assert
-            path1.Should().Be(path2);
+            await Assert.That(value)
+                        .IsAssignableTo<Some<object>>();
         });
     }
 
-    [Fact]
-    public void Option_satisfies_alternative_left_identity()
+    [Test]
+    public async Task Satisfies_stability_behavioral_rule_for_Null_case()
     {
-        var gen = Generator.Option;
+        // Arrange
+        var option = new Option<object>(null!);
 
-        gen.Sample(option =>
+        // Act
+        var value = option.Value;
+
+        // Assert
+        await Assert.That(value)
+                    .IsNull();
+    }
+
+    [Test]
+    public async Task Satisfies_access_pattern_consistency_for_HasValue()
+    {
+        var gen = Gen.Frequency((9, Common.OptionGenerator),
+                                (1, Gen.Const(new Option<object>(new None()))),
+                                (1, Gen.Const(new Option<object>(null!))));
+
+        await gen.SampleAsync(async option =>
         {
-            // Arrange
-            var monad = Option<int>.None();
-            var f = () => option;
-
             // Act
-            var result = monad.IfNone(f);
+            var result1 = option.HasValue;
+            var result2 = option.Value is not null;
 
             // Assert
-            result.Should().Be(option);
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
         });
     }
 
-    [Fact]
-    public void Option_satisfies_alternative_right_identity()
+    [Test]
+    public async Task Satisfies_access_pattern_consistency_for_TryGetValue_with_None_case()
     {
-        var gen = Generator.Option;
+        var gen = Gen.Frequency((9, Common.OptionGenerator),
+                                (1, Gen.Const(new Option<object>(new None()))),
+                                (1, Gen.Const(new Option<object>(null!))));
 
-        gen.Sample(monad =>
+        await gen.SampleAsync(async option =>
         {
-            // Arrange
-            var f = () => Option<int>.None();
-
             // Act
-            var result = monad.IfNone(f);
+            var result1 = option.TryGetValue(out None _);
+            var result2 = option.Value is None;
 
             // Assert
-            result.Should().Be(monad);
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
         });
     }
 
-    [Fact]
-    public void Option_satisfies_alternative_associativity()
+    [Test]
+    public async Task Satisfies_access_pattern_consistency_for_TryGetValue_with_Some_case()
     {
-        var gen = from x in Generator.Option
-                  from y in Generator.Option
-                  from z in Generator.Option
-                  select (x, y, z);
+        var gen = Gen.Frequency((9, Common.OptionGenerator),
+                                (1, Gen.Const(new Option<object>(new None()))),
+                                (1, Gen.Const(new Option<object>(null!))));
 
-        gen.Sample(tuple =>
+        await gen.SampleAsync(async option =>
         {
-            // Arrange
-            var (x, y, z) = tuple;
-
             // Act
-            var path1 = x.IfNone(() => y)
-                         .IfNone(() => z);
-
-            var path2 = x.IfNone(() => y.IfNone(() => z));
+#pragma warning disable CS8601 // Possible null reference assignment.
+            var result1 = option.TryGetValue(out Some<object> _);
+#pragma warning restore CS8601 // Possible null reference assignment.
+            var result2 = option.Value is Some<object>;
 
             // Assert
-            path1.Should().Be(path2);
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
         });
     }
+}
 
-    [Fact]
-    public void Option_satisfies_monad_plus_left_zero()
+public class Option_Some_Tests
+{
+    [Test]
+    public async Task Returns_an_option_in_the_some_state()
     {
-        var gen = Generator.IntToStringOption;
+        var gen = Generator.Object;
 
-        gen.Sample(f =>
+        await gen.SampleAsync(async x =>
         {
-            // Arrange
-            var monad = Option<int>.None();
-
             // Act
-            var result = monad.Bind(f);
+            var option = Option.Some(x);
 
             // Assert
-            var expected = Option<string>.None();
-            result.Should().Be(expected);
+            await Assert.That(option)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(x);
         });
     }
+}
 
-    [Fact]
-    public void Map_is_equivalent_to_bind_then_return()
+public class Option_Where_Tests()
+{
+    [Test]
+    public async Task Satisfies_predicate_conjunction()
     {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToString
-                  select (monad, f);
-
-        gen.Sample(x =>
-        {
-            // Arrange
-            var (monad, f) = x;
-
-            // Act
-            var path1 = monad.Map(f);
-            var path2 = monad.Bind(x => Option.Some(f(x)));
-
-            // Assert
-            path1.Should().Be(path2);
-        });
-    }
-
-    [Fact]
-    public void LINQ_Select_is_syntactic_sugar_for_map()
-    {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToString
-                  select (monad, f);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (monad, f) = tuple;
-
-            // Act
-            var path1 = from x in monad
-                        select f(x);
-
-            var path2 = monad.Select(f);
-
-            var path3 = monad.Map(f);
-
-            // Assert
-            path1.Should().Be(path2).And.Be(path3);
-        });
-    }
-
-    [Fact]
-    public void LINQ_SelectMany_is_syntactic_sugar_for_bind()
-    {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToStringOption
-                  from g1 in Generator.IntToString
-                  from g2 in Generator.StringToInt
-                  let g = (Func<int, string, int>)((int x, string y) => g2(g1(x) + y))
-                  select (monad, f, g);
-
-        gen.Sample(tuple =>
-        {
-            // Arrange
-            var (monad, f, g) = tuple;
-
-            // Act
-            var path1 = from x in monad
-                        from y in f(x)
-                        select g(x, y);
-
-            var path2 = monad.SelectMany(f, g);
-
-            var path3 = monad.Bind(x => f(x).Map(y => g(x, y)));
-
-            // Assert
-            path1.Should().Be(path2).And.Be(path3);
-        });
-    }
-
-    [Fact]
-    public async Task MapTask_handles_asynchronous_map()
-    {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToString
-                  select (monad, f);
+        var gen = from option in Common.OptionGenerator
+                  from predicate1 in Generator.ObjectPredicate
+                  from predicate2 in Generator.ObjectPredicate
+                  select (option, predicate1, predicate2);
 
         await gen.SampleAsync(async tuple =>
         {
             // Arrange
-            var (monad, f) = tuple;
+            var (option, predicate1, predicate2) = tuple;
 
             // Act
-            var path1 = monad.Map(f);
-            var path2 = await monad.MapTask(x => ValueTask.FromResult(f(x)));
+            var result1 = option.Where(predicate1)
+                                .Where(predicate2);
+
+            var result2 = option.Where(x => predicate1(x) && predicate2(x));
 
             // Assert
-            path1.Should().Be(path2);
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
         });
     }
 
-    [Fact]
-    public async Task BindTask_handles_asynchronous_bind()
+    [Test]
+    public async Task Satisfies_monadic_guard()
     {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToStringOption
-                  select (monad, f);
-
-        await gen.SampleAsync(async tuple =>
-        {
-            // Arrange
-            var (monad, f) = tuple;
-
-            // Act
-            var path1 = monad.Bind(f);
-            var path2 = await monad.BindTask(x => ValueTask.FromResult(f(x)));
-
-            // Assert
-            path1.Should().Be(path2);
-        });
-    }
-
-    [Fact]
-    public async Task BindTask_is_associative()
-    {
-        var gen = from monad in Generator.Option
-                  from f in Generator.IntToStringOptionTask
-                  from g in Generator.StringToIntOptionTask
-                  select (monad, f, g);
-
-        await gen.SampleAsync(async tuple =>
-        {
-            // Arrange
-            var (monad, f, g) = tuple;
-
-            // Act
-            var path1 = await (await monad.BindTask(f))
-                                          .BindTask(g);
-
-            var path2 = await monad.BindTask(async x => await (await f(x)).BindTask(g));
-
-            // Assert
-            path1.Should().Be(path2);
-        });
-    }
-
-    [Fact]
-    public void Where_is_a_monadic_guard()
-    {
-        var gen = from option in Generator.Option
-                  from predicate in Generator.IntPredicate
+        var gen = from option in Common.OptionGenerator
+                  from predicate in Generator.ObjectPredicate
                   select (option, predicate);
 
-        gen.Sample(x =>
+        await gen.SampleAsync(async tuple =>
         {
             // Arrange
-            var (option, predicate) = x;
+            var (option, predicate) = tuple;
 
             // Act
-            var path1 = option.Where(predicate);
-            var path2 = option.Bind(x => predicate(x) ? Option.Some(x) : Option.None);
+            var result1 = option.Where(predicate);
+            var result2 = option.Bind(x => predicate(x) ? Option.Some(x) : Option.None);
 
             // Assert
-            path1.Should().Be(path2);
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+}
+
+public class Option_Map_Tests()
+{
+    [Test]
+    public async Task Satisfies_functor_identity()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Act
+            var result = option.Map(x => x);
+
+            // Assert
+            await Assert.That(result)
+                        .IsEqualTo(option);
         });
     }
 
-    [Fact]
-    public void IfNoneThrow_with_some_returns_the_value()
+    [Test]
+    public async Task Satisfies_functor_composition()
     {
-        var gen = Gen.Int;
+        var gen = from option in Common.OptionGenerator
+                  from f in Generator.ObjectToObject
+                  from g in Generator.ObjectToObject
+                  select (option, f, g);
 
-        gen.Sample(value =>
+        await gen.SampleAsync(async tuple =>
         {
             // Arrange
-            var monad = Option.Some(value);
+            var (option, f, g) = tuple;
 
-            var exceptionFactoryCalled = false;
-            var f = () =>
+            // Act
+            var result1 = option.Map(x => g(f(x)));
+
+            var result2 = option.Map(f)
+                                .Map(g);
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_bind_then_return()
+    {
+        var gen = from option in Common.OptionGenerator
+                  from f in Generator.ObjectToObject
+                  select (option, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f) = tuple;
+
+            // Act
+            var result1 = option.Map(f);
+            var result2 = option.Bind(x => Option.Some(f(x)));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+}
+
+public class Option_MapTask_Tests()
+{
+    [Test]
+    public async Task Satisfies_traverse_identity()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Arrange
+            static async ValueTask<object> f(object x)
             {
-                exceptionFactoryCalled = true;
-                return new InvalidOperationException("should not be called");
-            };
-
-            // Act
-            var result = monad.IfNoneThrow(f);
-
-            // Assert
-            result.Should().Be(value);
-            exceptionFactoryCalled.Should().BeFalse();
-        });
-    }
-
-    [Fact]
-    public void IfNoneThrow_with_none_throws_the_exception()
-    {
-        var gen = from message in Gen.String
-                  where string.IsNullOrWhiteSpace(message) is false
-                  select message;
-
-        gen.Sample(message =>
-        {
-            // Arrange
-            var monad = Option<int>.None();
-            var f = () => new InvalidOperationException(message);
-
-            // Act
-            var action = () => monad.IfNoneThrow(f);
-
-            // Assert
-            action.Should().Throw<InvalidOperationException>()
-                  .WithMessage(message);
-        });
-    }
-
-    [Fact]
-    public void IfNoneNull_with_some_returns_the_value()
-    {
-        var gen = Gen.String;
-
-        gen.Sample(value =>
-        {
-            // Arrange
-            var monad = Option.Some(value);
-
-            // Act
-            var result = monad.IfNoneNull();
-
-            // Assert
-            result.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void IfNoneNull_with_none_returns_null()
-    {
-        var option = Option<string>.None();
-
-        // Act
-        var result = option.IfNoneNull();
-
-        // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void IfNoneNullable_with_some_returns_the_value()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            // Arrange
-            var monad = Option.Some(value);
-
-            // Act
-            var result = monad.IfNoneNullable();
-
-            // Assert
-            result.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void IfNoneNullable_with_none_returns_null()
-    {
-        var monad = Option<int>.None();
-
-        // Act
-        var result = monad.IfNoneNullable();
-
-        // Assert
-        result.Should().BeNull();
-    }
-
-    [Fact]
-    public void Iter_with_some_executes_action()
-    {
-        var gen = Gen.Int;
-
-        gen.Sample(value =>
-        {
-            // Arrange
-            var monad = Option.Some(value);
-
-            var actionedValue = 0;
-            void f(int value) => actionedValue += value;
-
-            // Act
-            monad.Iter(f);
-
-            // Assert
-            actionedValue.Should().Be(value);
-        });
-    }
-
-    [Fact]
-    public void Iter_with_none_does_not_execute_action()
-    {
-        var monad = Option<int>.None();
-
-        var actionedValue = 0;
-        void f(int value) => actionedValue += value;
-
-        // Act
-        monad.Iter(f);
-
-        // Assert
-        actionedValue.Should().Be(0);
-    }
-
-    [Fact]
-    public async Task IterTask_with_some_executes_action()
-    {
-        var gen = Gen.Int;
-
-        await gen.SampleAsync(async value =>
-        {
-            // Arrange
-            var option = Option.Some(value);
-
-            var actionedValue = 0;
-            async ValueTask f(int x)
-            {
-                await ValueTask.CompletedTask;
-                actionedValue += x;
+                await Task.Yield();
+                return x;
             }
 
             // Act
-            await option.IterTask(f);
+            var result = await option.MapTask(f);
 
             // Assert
-            actionedValue.Should().Be(value);
+            await Assert.That(result)
+                        .IsEqualTo(option);
         });
     }
 
-    [Fact]
-    public async Task IterTask_with_none_does_not_execute_action()
+    [Test]
+    public async Task Satisfies_traverse_naturality()
     {
-        var option = Option<int>.None();
+        var gen =
+            from option in Common.OptionGenerator
+            from f in
+                from f in Generator.ObjectToObject
+                select new Func<object, ValueTask<object>>(async x =>
+                {
+                    await Task.Yield();
+                    return f(x);
+                })
+            from g in Generator.ObjectToObject
+            select (option, f, g);
 
-        var actionedValue = 0;
-        async ValueTask f(int value)
+        await gen.SampleAsync(async tuple =>
         {
-            await ValueTask.CompletedTask;
-            actionedValue += value;
+            // Arrange
+            var (option, f, g) = tuple;
+
+            // Act
+            var r1 = await option.MapTask(f);
+            var result1 = r1.Map(g);
+
+            var result2 = await option.MapTask(async x =>
+            {
+                var r2 = await f(x);
+                return g(r2);
+            });
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_traverse_composition()
+    {
+        var gen =
+            from option in Common.OptionGenerator
+            from f in
+                from f in Generator.ObjectToObject
+                select new Func<object, ValueTask<object>>(async x =>
+                {
+                    await Task.Yield();
+                    return f(x);
+                })
+            from g in
+                from g in Generator.ObjectToObject
+                select new Func<object, ValueTask<object>>(async x =>
+                {
+                    await Task.Yield();
+                    return g(x);
+                })
+            select (option, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f, g) = tuple;
+
+            // Act
+            var r1 = await option.MapTask(f);
+            var result1 = await r1.MapTask(g);
+
+            var result2 = await option.MapTask(async x =>
+            {
+                var r2 = await f(x);
+                return await g(r2);
+            });
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_BindTask_then_return()
+    {
+        var gen = from option in Common.OptionGenerator
+                  from f in
+                      from f in Generator.ObjectToObject
+                      select new Func<object, ValueTask<object>>(async x =>
+                      {
+                          await Task.Yield();
+                          return f(x);
+                      })
+                  select (option, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f) = tuple;
+
+            // Act
+            var result1 = await option.MapTask(f);
+
+            var result2 = await option.BindTask(async x => Option.Some(await f(x)));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+}
+
+public class Option_Bind_Tests()
+{
+    [Test]
+    public async Task Satisfies_monad_left_identity()
+    {
+        var gen = from x in Generator.Object
+                  from f in Common.ObjectToOptionGenerator
+                  select (x, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (x, f) = tuple;
+            var option = Option.Some(x);
+
+            // Act
+            var result1 = option.Bind(f);
+            var result2 = f(x);
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_right_identity()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Act
+            var result = option.Bind(Option.Some);
+
+            // Assert
+            await Assert.That(result)
+                        .IsEqualTo(option);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_associativity()
+    {
+        var gen = from option in Common.OptionGenerator
+                  from f in Common.ObjectToOptionGenerator
+                  from g in Common.ObjectToOptionGenerator
+                  select (option, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f, g) = tuple;
+
+            // Act
+            var result1 = option.Bind(f)
+                                .Bind(g);
+
+            var result2 = option.Bind(x => f(x).Bind(g));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_zero_left_zero()
+    {
+        var gen = Common.ObjectToOptionGenerator;
+
+        await gen.SampleAsync(async f =>
+        {
+            // Act
+            var result = Common.NoneOption.Bind(f);
+
+            // Assert
+            await Assert.That(result)
+                        .IsNone();
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_zero_right_zero()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Act
+            var result = option.Bind(_ => Common.NoneOption);
+
+            // Assert
+            await Assert.That(result)
+                        .IsNone();
+        });
+    }
+}
+
+public class Option_BindTask_Tests()
+{
+    [Test]
+    public async Task Satisfies_monad_left_identity()
+    {
+        var gen = from x in Generator.Object
+                  from f in
+                      from f in Common.ObjectToOptionGenerator
+                      select new Func<object, ValueTask<Option<object>>>(async x =>
+                      {
+                          await Task.Yield();
+                          return f(x);
+                      })
+                  select (x, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (x, f) = tuple;
+            var option = Option.Some(x);
+
+            // Act
+            var result1 = await option.BindTask(f);
+            var result2 = await f(x);
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_right_identity()
+    {
+        var gen = Common.OptionGenerator;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Arrange
+            static async ValueTask<Option<object>> f(object x)
+            {
+                await Task.Yield();
+                return Option.Some(x);
+            }
+
+            // Act
+            var result = await option.BindTask(f);
+
+            // Assert
+            await Assert.That(result)
+                        .IsEqualTo(option);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_monad_associativity()
+    {
+        var gen = from option in Common.OptionGenerator
+                  from f in
+                      from f in Common.ObjectToOptionGenerator
+                      select new Func<object, ValueTask<Option<object>>>(async x =>
+                      {
+                          await Task.Yield();
+                          return f(x);
+                      })
+                  from g in
+                      from g in Common.ObjectToOptionGenerator
+                      select new Func<object, ValueTask<Option<object>>>(async x =>
+                      {
+                          await Task.Yield();
+                          return g(x);
+                      })
+                  select (option, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f, g) = tuple;
+
+            // Act
+            var result1 = await (await option.BindTask(f)).BindTask(g);
+
+            var result2 = await option.BindTask(async x => await (await f(x)).BindTask(g));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    public class Option_Select_Tests()
+    {
+        [Test]
+        public async Task LINQ_is_syntactic_sugar_for_map()
+        {
+            var gen = from option in Common.OptionGenerator
+                      from f in Generator.ObjectToObject
+                      select (option, f);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option, f) = tuple;
+
+                // Act
+                var result1 = from x in option
+                              select f(x);
+
+                var result2 = option.Select(f);
+
+                var result3 = option.Map(f);
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2)
+                            .And
+                            .IsEqualTo(result3);
+            });
+        }
+    }
+
+    public class Option_SelectMany_Tests()
+    {
+        [Test]
+        public async Task LINQ_is_syntactic_sugar_for_bind()
+        {
+            var gen = from option in Common.OptionGenerator
+                      from f in Common.ObjectToOptionGenerator
+                      from g1 in Generator.ObjectToObject
+                      from g2 in Generator.ObjectToObject
+                          // Nothing special, just a repeatable function with two parameters
+                      let g = new Func<object, object, object>((x, y) => g2(g1(x).ToString() + y.ToString()))
+                      select (option, f, g);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option, f, g) = tuple;
+
+                // Act
+                var result1 = from x in option
+                              from y in f(x)
+                              select g(x, y);
+
+                var result2 = option.SelectMany(f, g);
+
+                var result3 = option.Bind(x => f(x).Map(y => g(x, y)));
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2)
+                            .And
+                            .IsEqualTo(result3);
+            });
+        }
+    }
+
+    public class Option_IfNone_WithValueFallback_Tests()
+    {
+        [Test]
+        public async Task Some_returns_its_value()
+        {
+            var gen = from x in Generator.Object
+                      from f in
+                          from y in Generator.Object
+                          select new Func<object>(() => y)
+                      select (x, f);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (x, f) = tuple;
+                var some = Option.Some(x);
+
+                // Act
+                var result = some.IfNone(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
         }
 
-        // Act
-        await option.IterTask(f);
+        [Test]
+        public async Task None_returns_the_fallback()
+        {
+            var gen = Generator.Object;
 
-        // Assert
-        actionedValue.Should().Be(0);
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var f = () => x;
+
+                // Act
+                var result = Common.NoneOption.IfNone(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+    }
+
+    public class Option_IfNone_WithOptionFallback_Tests()
+    {
+        [Test]
+        public async Task Satisfies_alternative_left_identity()
+        {
+            var gen = Common.OptionGenerator;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Act
+                var result = Common.NoneOption.IfNone(() => option);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(option);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_alternative_right_identity()
+        {
+            var gen = Common.OptionGenerator;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Act
+                var result = option.IfNone(() => Common.NoneOption);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(option);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_alternative_associativity()
+        {
+            var gen = from option1 in Common.OptionGenerator
+                      from option2 in Common.OptionGenerator
+                      from option3 in Common.OptionGenerator
+                      select (option1, option2, option3);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option1, option2, option3) = tuple;
+
+                // Act
+                var result1 = option1.IfNone(() => option2)
+                                     .IfNone(() => option3);
+
+                var result2 = option1.IfNone(() => option2.IfNone(() => option3));
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_left_bias()
+        {
+            var gen = from x in Generator.Object
+                      from f in
+                          from y in Common.OptionGenerator
+                          select new Func<Option<object>>(() => y)
+                      select (x, f);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (x, f) = tuple;
+                var option = Option.Some(x);
+
+                // Act
+                var result = option.IfNone(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsSome()
+                            .WhoseValue
+                            .IsEqualTo(x);
+            });
+        }
+    }
+
+    public class Option_IfNone_WithAction_Tests()
+    {
+        [Test]
+        public async Task Executes_action_if_none()
+        {
+            // Arrange
+            var actionExecuted = false;
+
+            // Act
+            Common.NoneOption.IfNone(() => actionExecuted = true);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsTrue();
+        }
+
+        [Test]
+        public async Task Does_not_execute_action_if_some()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var some = Option.Some(x);
+
+                var actionExecuted = false;
+                void f() => actionExecuted = true;
+
+                // Act
+                some.IfNone(f);
+
+                // Assert
+                await Assert.That(actionExecuted)
+                            .IsFalse();
+            });
+        }
+    }
+
+    public class Option_IfNoneTask_WithValueFallback__Tests()
+    {
+        [Test]
+        public async Task Some_returns_its_value()
+        {
+            var gen = from x in Generator.Object
+                      from f in
+                          from y in Generator.Object
+                          select new Func<ValueTask<object>>(async () =>
+                          {
+                              await Task.Yield();
+                              return y;
+                          })
+                      select (x, f);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (x, f) = tuple;
+                var some = Option.Some(x);
+
+                // Act
+                var result = await some.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task None_returns_the_fallback()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                async ValueTask<object> f()
+                {
+                    await Task.Yield();
+                    return x;
+                }
+
+                // Act
+                var result = await Common.NoneOption.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+    }
+
+    public class Option_IfNoneTask_WithOptionFallback_Tests()
+    {
+        [Test]
+        public async Task Satisfies_alternative_left_identity()
+        {
+            var gen = Common.OptionGenerator;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Arrange
+                async ValueTask<Option<object>> f()
+                {
+                    await Task.Yield();
+                    return option;
+                }
+
+                // Act
+                var result = await Common.NoneOption.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(option);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_alternative_right_identity()
+        {
+            var gen = Common.OptionGenerator;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Arrange
+                static async ValueTask<Option<object>> f()
+                {
+                    await Task.Yield();
+                    return Common.NoneOption;
+                }
+
+                // Act
+                var result = await option.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(option);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_alternative_associativity()
+        {
+            var gen = from option1 in Common.OptionGenerator
+                      from option2 in Common.OptionGenerator
+                      from option3 in Common.OptionGenerator
+                      select (option1, option2, option3);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option1, option2, option3) = tuple;
+
+                // Act
+                var result1 =
+                    await (await option1.IfNoneTask(async () =>
+                                         {
+                                             await Task.Yield();
+                                             return option2;
+                                         }))
+                                         .IfNoneTask(async () =>
+                                         {
+                                             await Task.Yield();
+                                             return option3;
+                                         });
+
+                var result2 =
+                    await option1.IfNoneTask(async () =>
+                    {
+                        await Task.Yield();
+
+                        return await option2.IfNoneTask(async () =>
+                        {
+                            await Task.Yield();
+                            return option3;
+                        });
+                    });
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2);
+            });
+        }
+
+        [Test]
+        public async Task Satisfies_left_bias()
+        {
+            var gen = from x in Generator.Object
+                      from f in
+                          from y in Common.OptionGenerator
+                          select new Func<ValueTask<Option<object>>>(async () =>
+                          {
+                              await Task.Yield();
+                              return y;
+                          })
+                      select (x, f);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (x, f) = tuple;
+                var option = Option.Some(x);
+
+                // Act
+                var result = await option.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(result)
+                            .IsSome()
+                            .WhoseValue
+                            .IsEqualTo(x);
+            });
+        }
+    }
+
+    public class Option_IfNoneTask_With_Action_Tests()
+    {
+        [Test]
+        public async Task Executes_action_if_none()
+        {
+            // Arrange
+            var actionExecuted = false;
+
+            async ValueTask f()
+            {
+                await Task.Yield();
+                actionExecuted = true;
+            }
+
+            // Act
+            await Common.NoneOption.IfNoneTask(f);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsTrue();
+        }
+
+        [Test]
+        public async Task Does_not_execute_action_if_some()
+        {
+            var gen = Common.SomeOptionGenerator;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Arrange
+                var actionExecuted = false;
+                async ValueTask f()
+                {
+                    await Task.Yield();
+                    actionExecuted = true;
+                }
+
+                // Act
+                await option.IfNoneTask(f);
+
+                // Assert
+                await Assert.That(actionExecuted)
+                            .IsFalse();
+            });
+        }
+    }
+
+    public class Option_IfNoneNull_Tests()
+    {
+        [Test]
+        public async Task Some_returns_its_value()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var some = Option.Some(x);
+
+                // Act
+                var result = some.IfNoneNull();
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task None_returns_null()
+        {
+            // Act
+            var result = Common.NoneOption.IfNoneNull();
+
+            // Assert
+            await Assert.That(result)
+                        .IsNull();
+        }
+    }
+
+    public class Option_IfNoneNullable_Tests()
+    {
+        [Test]
+        public async Task Some_returns_its_value()
+        {
+            var gen = Gen.Int;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var some = Option.Some(x);
+
+                // Act
+                var result = some.IfNoneNullable();
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task None_returns_null()
+        {
+            // Arrange
+            var none = new Option<int>(Option.None);
+
+            // Act
+            var result = none.IfNoneNullable();
+
+            // Assert
+            await Assert.That(result)
+                        .IsNull();
+        }
+    }
+
+    public class Option_Iter_Tests()
+    {
+        [Test]
+        public async Task Some_executes_action()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var some = Option.Some(x);
+
+                object? passedValue = null;
+                void f(object value) => passedValue = value;
+
+                // Act
+                some.Iter(f);
+
+                // Assert
+                await Assert.That(passedValue)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task None_does_not_execute_action()
+        {
+            // Arrange
+            var none = Common.NoneOption;
+
+            var actionExecuted = false;
+            void f(object _) => actionExecuted = true;
+
+            // Act
+            none.Iter(f);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
+        }
+    }
+
+    public class Option_IterTask_Tests()
+    {
+        [Test]
+        public async Task Some_executes_action()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var some = Option.Some(x);
+
+                object? passedValue = null;
+                async ValueTask f(object value)
+                {
+                    await Task.Yield();
+                    passedValue = value;
+                }
+
+                // Act
+                await some.IterTask(f);
+
+                // Assert
+                await Assert.That(passedValue)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task None_does_not_execute_action()
+        {
+            // Arrange
+            var none = Common.NoneOption;
+
+            var actionExecuted = false;
+            async ValueTask f(object _)
+            {
+                await Task.Yield();
+                actionExecuted = true;
+            }
+
+            // Act
+            await none.IterTask(f);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
+        }
     }
 }

@@ -1,140 +1,156 @@
-﻿using FluentAssertions;
-using FluentAssertions.Execution;
-using FluentAssertions.Primitives;
-using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
+﻿using System;
+using System.Threading.Tasks;
+using TUnit.Assertions.Core;
+using TUnit.Assertions.Sources;
 
 namespace common.tests;
 
-internal sealed class EitherAssertions<TLeft, TRight>(Either<TLeft, TRight> subject, AssertionChain assertionChain) : ReferenceTypeAssertions<Either<TLeft, TRight>, EitherAssertions<TLeft, TRight>>(subject, assertionChain)
+public sealed class ResultIsSuccessAssertion<T>(AssertionContext<Result<T>> context) : Assertion<Result<T>>(context)
 {
-    protected override string Identifier { get; } = "either";
+    protected override string GetExpectation() => "Result to be Success.";
 
-    public AndWhichConstraint<EitherAssertions<TLeft, TRight>, TLeft> BeLeft([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
+    public ValueAssertion<T> WhoseValue =>
+        new TAssertion(Context.Map(result => result switch
+        {
+            Success<T> { Value: var t } => t,
+            Error => throw new InvalidOperationException("result is Error"),
+            null => throw new InvalidOperationException("result is null"),
+        }));
+
+    protected override async Task<AssertionResult> CheckAsync(EvaluationMetadata<Result<T>> metadata)
     {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsLeft)
-            .FailWith("Expected {context:either} to be left{reason}, but it was right with value {0}.",
-                       () => Subject.Match(_ => throw new UnreachableException(), right => right));
+        await ValueTask.CompletedTask;
 
-        return new AndWhichConstraint<EitherAssertions<TLeft, TRight>, TLeft>(
-            this,
-            Subject.IfRightThrow(new UnreachableException()));
+        var value = metadata.Value;
+        var exception = metadata.Exception;
+
+        return (value, exception) switch
+        {
+            (_, not null) => AssertionResult.Failed($"threw {exception.GetType().Name} with message {exception.Message}."),
+            (Success<T>, _) => AssertionResult.Passed,
+            (Error, _) => AssertionResult.Failed("result is Error"),
+            (null, _) => AssertionResult.Failed("result is null"),
+        };
     }
 
-    public AndWhichConstraint<EitherAssertions<TLeft, TRight>, TRight> BeRight([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsRight)
-            .FailWith("Expected {context:either} to be right{reason}, but it was left with value {0}.",
-                       () => Subject.Match(left => left, _ => throw new UnreachableException()));
+    private sealed class TAssertion(AssertionContext<T> context) : ValueAssertion<T>(context);
+}
 
-        return new AndWhichConstraint<EitherAssertions<TLeft, TRight>, TRight>(
-            this,
-            Subject.IfLeftThrow(new UnreachableException()));
+public sealed class ResultIsErrorAssertion<T>(AssertionContext<Result<T>> context) : Assertion<Result<T>>(context)
+{
+    public ValueAssertion<Error> Which =>
+        new ErrorAssertion(Context.Map(result => result switch
+        {
+            Error error => error,
+            Success<T> { Value: var t } => throw new InvalidOperationException($"result is Success with value {t}"),
+            null => throw new InvalidOperationException("result is null"),
+        }));
+
+    protected override async Task<AssertionResult> CheckAsync(EvaluationMetadata<Result<T>> metadata)
+    {
+        await ValueTask.CompletedTask;
+
+        var value = metadata.Value;
+        var exception = metadata.Exception;
+
+        return (value, exception) switch
+        {
+            (_, not null) => AssertionResult.Failed($"threw {exception.GetType().Name} with message {exception.Message}."),
+            (Error, _) => AssertionResult.Passed,
+            (Success<T> { Value: var t }, _) => AssertionResult.Failed($"result is Success with value {t}"),
+            (null, _) => AssertionResult.Failed("result is null"),
+        };
     }
 
-    public AndConstraint<EitherAssertions<TLeft, TRight>> Be(Either<TLeft, TRight> expected, [StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.Equals(expected))
-            .FailWith("Expected {context:either} to be {0}{reason}, but it was {1}.", expected, Subject);
+    protected override string GetExpectation() => "to be Error";
 
-        return new AndConstraint<EitherAssertions<TLeft, TRight>>(this);
+    private sealed class ErrorAssertion(AssertionContext<Error> context) : ValueAssertion<Error>(context);
+}
+
+public sealed class OptionIsSomeAssertion<T>(AssertionContext<Option<T>> context) : Assertion<Option<T>>(context)
+{
+    protected override string GetExpectation() => "Option to be Some.";
+
+    public ValueAssertion<T> WhoseValue =>
+        new TAssertion(Context.Map(option => option switch
+        {
+            Some<T> { Value: var t } => t,
+            None => throw new InvalidOperationException("option is None"),
+            null => throw new InvalidOperationException("option is null"),
+        }));
+
+    protected override async Task<AssertionResult> CheckAsync(EvaluationMetadata<Option<T>> metadata)
+    {
+        await ValueTask.CompletedTask;
+
+        var value = metadata.Value;
+        var exception = metadata.Exception;
+
+        return (value, exception) switch
+        {
+            (_, not null) => AssertionResult.Failed($"threw {exception.GetType().Name} with message {exception.Message}."),
+            (Some<T>, _) => AssertionResult.Passed,
+            (None, _) => AssertionResult.Failed("option is None"),
+            (null, _) => AssertionResult.Failed("option is null"),
+        };
+    }
+
+    private sealed class TAssertion(AssertionContext<T> context) : ValueAssertion<T>(context);
+}
+
+public static class ResultAssertionExtensions
+{
+    extension<T>(IAssertionSource<Result<T>> source)
+    {
+        public ResultIsSuccessAssertion<T> IsSuccess()
+        {
+            source.Context.ExpressionBuilder.Append($".IsSuccess()");
+            return new(source.Context);
+        }
+
+        public ResultIsErrorAssertion<T> IsError()
+        {
+            source.Context.ExpressionBuilder.Append($".IsError()");
+            return new(source.Context);
+        }
     }
 }
 
-
-internal sealed class OptionAssertions<T>(Option<T> subject, AssertionChain assertionChain) : ReferenceTypeAssertions<Option<T>, OptionAssertions<T>>(subject, assertionChain)
+public sealed class OptionIsNoneAssertion<T>(AssertionContext<Option<T>> context) : Assertion<Option<T>>(context)
 {
-    protected override string Identifier { get; } = "option";
-
-    public AndWhichConstraint<OptionAssertions<T>, T> BeSome([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
+    protected override async Task<AssertionResult> CheckAsync(EvaluationMetadata<Option<T>> metadata)
     {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsSome)
-            .FailWith("Expected {context:option} to be some{reason}, but it was none.");
+        await ValueTask.CompletedTask;
 
-        return new AndWhichConstraint<OptionAssertions<T>, T>(
-            this,
-            Subject.IfNoneThrow(() => new UnreachableException()));
+        var value = metadata.Value;
+        var exception = metadata.Exception;
+
+        return (value, exception) switch
+        {
+            (_, not null) => AssertionResult.Failed($"threw {exception.GetType().Name} with message {exception.Message}."),
+            (None, _) => AssertionResult.Passed,
+            (Some<T> { Value: var t }, _) => AssertionResult.Failed($"option is Some with value {t}"),
+            (null, _) => AssertionResult.Failed("option is null"),
+        };
     }
 
-    public AndConstraint<OptionAssertions<T>> BeNone([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsNone)
-            .FailWith("Expected {context:option} to be none{reason}, but it was some with value {0}.",
-                       () => Subject.Match(value => value, () => throw new UnreachableException()));
-
-        return new AndConstraint<OptionAssertions<T>>(this);
-    }
-
-    public AndConstraint<OptionAssertions<T>> Be(Option<T> expected, [StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.Equals(expected))
-            .FailWith("Expected {context:option} to be {0}{reason}, but it was {1}.", expected, Subject);
-
-        return new AndConstraint<OptionAssertions<T>>(this);
-    }
+    protected override string GetExpectation() => "to be None";
 }
 
-internal sealed class ResultAssertions<T>(Result<T> subject, AssertionChain assertionChain) : ReferenceTypeAssertions<Result<T>, ResultAssertions<T>>(subject, assertionChain)
+public static class OptionAssertionExtensions
 {
-    protected override string Identifier { get; } = "result";
-
-    public AndWhichConstraint<ResultAssertions<T>, T> BeSuccess([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
+    extension<T>(IAssertionSource<Option<T>> source)
     {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsSuccess)
-            .FailWith("Expected {context:result} to be success{reason}, but it was error with error {0}.",
-                       () => Subject.Match(_ => throw new UnreachableException(), error => error));
+        public OptionIsSomeAssertion<T> IsSome()
+        {
+            source.Context.ExpressionBuilder.Append($".IsSome()");
+            return new(source.Context);
+        }
 
-        return new AndWhichConstraint<ResultAssertions<T>, T>(
-            this,
-            Subject.IfErrorThrow());
+        public OptionIsNoneAssertion<T> IsNone()
+        {
+            source.Context.ExpressionBuilder.Append($".IsNone()");
+            return new(source.Context);
+        }
     }
-
-    public AndWhichConstraint<ResultAssertions<T>, Error> BeError([StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.IsError)
-            .FailWith("Expected {context:result} to be error{reason}, but it was success with value {0}.",
-                       () => Subject.IfErrorThrow());
-
-        return new AndWhichConstraint<ResultAssertions<T>, Error>(
-            this,
-            Subject.Match(success => throw (new UnreachableException()), error => error));
-    }
-
-    public AndConstraint<ResultAssertions<T>> Be(Result<T> expected, [StringSyntax("CompositeFormat")] string because = "", params object[] becauseArgs)
-    {
-        CurrentAssertionChain
-            .BecauseOf(because, becauseArgs)
-            .ForCondition(Subject.Equals(expected))
-            .FailWith("Expected {context:result} to be {0}{reason}, but it was {1}.", expected, Subject);
-
-        return new AndConstraint<ResultAssertions<T>>(this);
-    }
-}
-
-internal static class AssertionExtensions
-{
-    public static EitherAssertions<TLeft, TRight> Should<TLeft, TRight>(this Either<TLeft, TRight> subject) =>
-        new(subject, AssertionChain.GetOrCreate());
-
-    public static OptionAssertions<T> Should<T>(this Option<T> subject) =>
-        new(subject, AssertionChain.GetOrCreate());
-
-    public static ResultAssertions<T> Should<T>(this Result<T> subject) =>
-        new(subject, AssertionChain.GetOrCreate());
 }
