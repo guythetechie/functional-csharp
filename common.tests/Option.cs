@@ -6,26 +6,6 @@ using System.Threading.Tasks;
 
 namespace common.tests;
 
-file static class Common
-{
-    public static Gen<Option<object>> SomeOptionGenerator { get; } =
-        from x in Generator.Object
-        select Option.Some(x);
-
-    public static Option<object> NoneOption { get; } = Option.None;
-
-    public static Gen<Option<object>> OptionGenerator { get; } =
-        Gen.Frequency((9, SomeOptionGenerator),
-                      (1, Gen.Const(NoneOption)));
-
-    public static Gen<Func<object, Option<object>>> ObjectToOptionGenerator { get; } =
-        from predicate in Generator.ObjectPredicate
-        from f in Generator.ObjectToObject
-        select new Func<object, Option<object>>(x => predicate(x)
-                                                        ? Option.Some(f(x))
-                                                        : Option.None);
-}
-
 public class None_ToString_Tests
 {
     [Test]
@@ -90,7 +70,7 @@ public class OptionT_None_ImplicitOperator_Tests
     public async Task Implicitly_converts_None_to_an_option_in_the_none_state()
     {
         // Assert
-        await Assert.That(Common.NoneOption)
+        await Assert.That(Generator.NoneOption)
                     .IsNone();
     }
 }
@@ -140,7 +120,7 @@ public class OptionT_Equality_Tests
     [Test]
     public async Task Equality_is_reflexive()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
@@ -282,7 +262,7 @@ public class Option_UnionType_Tests()
     [Test]
     public async Task Satisfies_soundness_behavioral_rule()
     {
-        var gen = Gen.Frequency((9, Common.OptionGenerator),
+        var gen = Gen.Frequency((9, Generator.Option),
                                 (1, Gen.Const(new Option<object>(new None()))),
                                 (1, Gen.Const(new Option<object>(null!))));
 
@@ -350,7 +330,7 @@ public class Option_UnionType_Tests()
     [Test]
     public async Task Satisfies_access_pattern_consistency_for_HasValue()
     {
-        var gen = Gen.Frequency((9, Common.OptionGenerator),
+        var gen = Gen.Frequency((9, Generator.Option),
                                 (1, Gen.Const(new Option<object>(new None()))),
                                 (1, Gen.Const(new Option<object>(null!))));
 
@@ -369,7 +349,7 @@ public class Option_UnionType_Tests()
     [Test]
     public async Task Satisfies_access_pattern_consistency_for_TryGetValue_with_None_case()
     {
-        var gen = Gen.Frequency((9, Common.OptionGenerator),
+        var gen = Gen.Frequency((9, Generator.Option),
                                 (1, Gen.Const(new Option<object>(new None()))),
                                 (1, Gen.Const(new Option<object>(null!))));
 
@@ -388,7 +368,7 @@ public class Option_UnionType_Tests()
     [Test]
     public async Task Satisfies_access_pattern_consistency_for_TryGetValue_with_Some_case()
     {
-        var gen = Gen.Frequency((9, Common.OptionGenerator),
+        var gen = Gen.Frequency((9, Generator.Option),
                                 (1, Gen.Const(new Option<object>(new None()))),
                                 (1, Gen.Const(new Option<object>(null!))));
 
@@ -433,7 +413,7 @@ public class Option_Where_Tests()
     [Test]
     public async Task Satisfies_predicate_conjunction()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from predicate1 in Generator.ObjectPredicate
                   from predicate2 in Generator.ObjectPredicate
                   select (option, predicate1, predicate2);
@@ -458,7 +438,7 @@ public class Option_Where_Tests()
     [Test]
     public async Task Satisfies_monadic_guard()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from predicate in Generator.ObjectPredicate
                   select (option, predicate);
 
@@ -483,7 +463,7 @@ public class Option_Map_Tests()
     [Test]
     public async Task Satisfies_functor_identity()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
@@ -499,7 +479,7 @@ public class Option_Map_Tests()
     [Test]
     public async Task Satisfies_functor_composition()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from f in Generator.ObjectToObject
                   from g in Generator.ObjectToObject
                   select (option, f, g);
@@ -524,7 +504,7 @@ public class Option_Map_Tests()
     [Test]
     public async Task Satisfies_bind_then_return()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from f in Generator.ObjectToObject
                   select (option, f);
 
@@ -549,7 +529,7 @@ public class Option_MapTask_Tests()
     [Test]
     public async Task Satisfies_traverse_identity()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
@@ -573,7 +553,7 @@ public class Option_MapTask_Tests()
     public async Task Satisfies_traverse_naturality()
     {
         var gen =
-            from option in Common.OptionGenerator
+            from option in Generator.Option
             from f in
                 from f in Generator.ObjectToObject
                 select new Func<object, ValueTask<object>>(async x =>
@@ -609,7 +589,7 @@ public class Option_MapTask_Tests()
     public async Task Satisfies_traverse_composition()
     {
         var gen =
-            from option in Common.OptionGenerator
+            from option in Generator.Option
             from f in
                 from f in Generator.ObjectToObject
                 select new Func<object, ValueTask<object>>(async x =>
@@ -650,7 +630,7 @@ public class Option_MapTask_Tests()
     [Test]
     public async Task Satisfies_BindTask_then_return()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from f in
                       from f in Generator.ObjectToObject
                       select new Func<object, ValueTask<object>>(async x =>
@@ -683,7 +663,7 @@ public class Option_Bind_Tests()
     public async Task Satisfies_monad_left_identity()
     {
         var gen = from x in Generator.Object
-                  from f in Common.ObjectToOptionGenerator
+                  from f in Generator.ObjectToOption
                   select (x, f);
 
         await gen.SampleAsync(async tuple =>
@@ -705,7 +685,7 @@ public class Option_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_right_identity()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
@@ -721,9 +701,9 @@ public class Option_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_associativity()
     {
-        var gen = from option in Common.OptionGenerator
-                  from f in Common.ObjectToOptionGenerator
-                  from g in Common.ObjectToOptionGenerator
+        var gen = from option in Generator.Option
+                  from f in Generator.ObjectToOption
+                  from g in Generator.ObjectToOption
                   select (option, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -746,12 +726,12 @@ public class Option_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_zero_left_zero()
     {
-        var gen = Common.ObjectToOptionGenerator;
+        var gen = Generator.ObjectToOption;
 
         await gen.SampleAsync(async f =>
         {
             // Act
-            var result = Common.NoneOption.Bind(f);
+            var result = Generator.NoneOption.Bind(f);
 
             // Assert
             await Assert.That(result)
@@ -762,12 +742,12 @@ public class Option_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_zero_right_zero()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
             // Act
-            var result = option.Bind(_ => Common.NoneOption);
+            var result = option.Bind(_ => Generator.NoneOption);
 
             // Assert
             await Assert.That(result)
@@ -783,7 +763,7 @@ public class Option_BindTask_Tests()
     {
         var gen = from x in Generator.Object
                   from f in
-                      from f in Common.ObjectToOptionGenerator
+                      from f in Generator.ObjectToOption
                       select new Func<object, ValueTask<Option<object>>>(async x =>
                       {
                           await Task.Yield();
@@ -810,7 +790,7 @@ public class Option_BindTask_Tests()
     [Test]
     public async Task Satisfies_monad_right_identity()
     {
-        var gen = Common.OptionGenerator;
+        var gen = Generator.Option;
 
         await gen.SampleAsync(async option =>
         {
@@ -833,16 +813,16 @@ public class Option_BindTask_Tests()
     [Test]
     public async Task Satisfies_monad_associativity()
     {
-        var gen = from option in Common.OptionGenerator
+        var gen = from option in Generator.Option
                   from f in
-                      from f in Common.ObjectToOptionGenerator
+                      from f in Generator.ObjectToOption
                       select new Func<object, ValueTask<Option<object>>>(async x =>
                       {
                           await Task.Yield();
                           return f(x);
                       })
                   from g in
-                      from g in Common.ObjectToOptionGenerator
+                      from g in Generator.ObjectToOption
                       select new Func<object, ValueTask<Option<object>>>(async x =>
                       {
                           await Task.Yield();
@@ -871,7 +851,7 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task LINQ_is_syntactic_sugar_for_map()
         {
-            var gen = from option in Common.OptionGenerator
+            var gen = from option in Generator.Option
                       from f in Generator.ObjectToObject
                       select (option, f);
 
@@ -902,8 +882,8 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task LINQ_is_syntactic_sugar_for_bind()
         {
-            var gen = from option in Common.OptionGenerator
-                      from f in Common.ObjectToOptionGenerator
+            var gen = from option in Generator.Option
+                      from f in Generator.ObjectToOption
                       from g1 in Generator.ObjectToObject
                       from g2 in Generator.ObjectToObject
                           // Nothing special, just a repeatable function with two parameters
@@ -930,6 +910,161 @@ public class Option_BindTask_Tests()
                             .And
                             .IsEqualTo(result3);
             });
+        }
+    }
+
+    public class Option_Match_Tests()
+    {
+        [Test]
+        public async Task Some_returns_some_function_result()
+        {
+            var gen = from x in Generator.Object
+                      from f in Generator.ObjectToObject
+                      from y in Generator.Object
+                      select (x, f, y);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (x, f, y) = tuple;
+                var option = Option.Some(x);
+
+                // Act
+                var result = option.Match(f, () => y);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(f(x));
+            });
+        }
+
+        [Test]
+        public async Task None_returns_none_function_result()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Act
+                var result = Generator.NoneOption.Match(value => value, () => x);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(x);
+            });
+        }
+
+        [Test]
+        public async Task Reconstructs_original_option()
+        {
+            var gen = Generator.Option;
+
+            await gen.SampleAsync(async option =>
+            {
+                // Act
+                var result = option.Match(Option.Some, () => Generator.NoneOption);
+
+                // Assert
+                await Assert.That(result)
+                            .IsEqualTo(option);
+            });
+        }
+
+        [Test]
+        public async Task Fuses_with_Map()
+        {
+            var gen = from option in Generator.Option
+                      from f in Generator.ObjectToObject
+                      from g in Generator.ObjectToObject
+                      from y in Generator.Object
+                      select (option, f, g, y);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option, f, g, y) = tuple;
+
+                // Act
+                var result1 = option.Map(f)
+                                    .Match(g, () => y);
+
+                var result2 = option.Match(x => g(f(x)), () => y);
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2);
+            });
+        }
+
+        [Test]
+        public async Task Fuses_with_Bind()
+        {
+            var gen = from option in Generator.Option
+                      from f in Generator.ObjectToOption
+                      from g in Generator.ObjectToObject
+                      from y in Generator.Object
+                      select (option, f, g, y);
+
+            await gen.SampleAsync(async tuple =>
+            {
+                // Arrange
+                var (option, f, g, y) = tuple;
+
+                // Act
+                var result1 = option.Bind(f)
+                                    .Match(g, () => y);
+
+                var result2 = option.Match(x => f(x).Match(g, () => y), () => y);
+
+                // Assert
+                await Assert.That(result1)
+                            .IsEqualTo(result2);
+            });
+        }
+    }
+
+    public class Option_Match_WithAction_Tests()
+    {
+        [Test]
+        public async Task Some_executes_some_action()
+        {
+            var gen = Generator.Object;
+
+            await gen.SampleAsync(async x =>
+            {
+                // Arrange
+                var option = Option.Some(x);
+                object? observed = null;
+                var noneExecuted = false;
+
+                // Act
+                option.Match(value => observed = value,
+                             () => noneExecuted = true);
+
+                // Assert
+                await Assert.That(observed)
+                            .IsEqualTo(x);
+                await Assert.That(noneExecuted)
+                            .IsFalse();
+            });
+        }
+
+        [Test]
+        public async Task None_executes_none_action()
+        {
+            // Arrange
+            object? observed = null;
+            var noneExecuted = false;
+
+            // Act
+            Generator.NoneOption.Match(value => observed = value,
+                                    () => noneExecuted = true);
+
+            // Assert
+            await Assert.That(observed)
+                        .IsNull();
+            await Assert.That(noneExecuted)
+                        .IsTrue();
         }
     }
 
@@ -970,7 +1105,7 @@ public class Option_BindTask_Tests()
                 var f = () => x;
 
                 // Act
-                var result = Common.NoneOption.IfNone(f);
+                var result = Generator.NoneOption.IfNone(f);
 
                 // Assert
                 await Assert.That(result)
@@ -984,12 +1119,12 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_left_identity()
         {
-            var gen = Common.OptionGenerator;
+            var gen = Generator.Option;
 
             await gen.SampleAsync(async option =>
             {
                 // Act
-                var result = Common.NoneOption.IfNone(() => option);
+                var result = Generator.NoneOption.IfNone(() => option);
 
                 // Assert
                 await Assert.That(result)
@@ -1000,12 +1135,12 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_right_identity()
         {
-            var gen = Common.OptionGenerator;
+            var gen = Generator.Option;
 
             await gen.SampleAsync(async option =>
             {
                 // Act
-                var result = option.IfNone(() => Common.NoneOption);
+                var result = option.IfNone(() => Generator.NoneOption);
 
                 // Assert
                 await Assert.That(result)
@@ -1016,9 +1151,9 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_associativity()
         {
-            var gen = from option1 in Common.OptionGenerator
-                      from option2 in Common.OptionGenerator
-                      from option3 in Common.OptionGenerator
+            var gen = from option1 in Generator.Option
+                      from option2 in Generator.Option
+                      from option3 in Generator.Option
                       select (option1, option2, option3);
 
             await gen.SampleAsync(async tuple =>
@@ -1043,7 +1178,7 @@ public class Option_BindTask_Tests()
         {
             var gen = from x in Generator.Object
                       from f in
-                          from y in Common.OptionGenerator
+                          from y in Generator.Option
                           select new Func<Option<object>>(() => y)
                       select (x, f);
 
@@ -1074,7 +1209,7 @@ public class Option_BindTask_Tests()
             var actionExecuted = false;
 
             // Act
-            Common.NoneOption.IfNone(() => actionExecuted = true);
+            Generator.NoneOption.IfNone(() => actionExecuted = true);
 
             // Assert
             await Assert.That(actionExecuted)
@@ -1149,7 +1284,7 @@ public class Option_BindTask_Tests()
                 }
 
                 // Act
-                var result = await Common.NoneOption.IfNoneTask(f);
+                var result = await Generator.NoneOption.IfNoneTask(f);
 
                 // Assert
                 await Assert.That(result)
@@ -1163,7 +1298,7 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_left_identity()
         {
-            var gen = Common.OptionGenerator;
+            var gen = Generator.Option;
 
             await gen.SampleAsync(async option =>
             {
@@ -1175,7 +1310,7 @@ public class Option_BindTask_Tests()
                 }
 
                 // Act
-                var result = await Common.NoneOption.IfNoneTask(f);
+                var result = await Generator.NoneOption.IfNoneTask(f);
 
                 // Assert
                 await Assert.That(result)
@@ -1186,7 +1321,7 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_right_identity()
         {
-            var gen = Common.OptionGenerator;
+            var gen = Generator.Option;
 
             await gen.SampleAsync(async option =>
             {
@@ -1194,7 +1329,7 @@ public class Option_BindTask_Tests()
                 static async ValueTask<Option<object>> f()
                 {
                     await Task.Yield();
-                    return Common.NoneOption;
+                    return Generator.NoneOption;
                 }
 
                 // Act
@@ -1209,9 +1344,9 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Satisfies_alternative_associativity()
         {
-            var gen = from option1 in Common.OptionGenerator
-                      from option2 in Common.OptionGenerator
-                      from option3 in Common.OptionGenerator
+            var gen = from option1 in Generator.Option
+                      from option2 in Generator.Option
+                      from option3 in Generator.Option
                       select (option1, option2, option3);
 
             await gen.SampleAsync(async tuple =>
@@ -1255,7 +1390,7 @@ public class Option_BindTask_Tests()
         {
             var gen = from x in Generator.Object
                       from f in
-                          from y in Common.OptionGenerator
+                          from y in Generator.Option
                           select new Func<ValueTask<Option<object>>>(async () =>
                           {
                               await Task.Yield();
@@ -1296,7 +1431,7 @@ public class Option_BindTask_Tests()
             }
 
             // Act
-            await Common.NoneOption.IfNoneTask(f);
+            await Generator.NoneOption.IfNoneTask(f);
 
             // Assert
             await Assert.That(actionExecuted)
@@ -1306,7 +1441,7 @@ public class Option_BindTask_Tests()
         [Test]
         public async Task Does_not_execute_action_if_some()
         {
-            var gen = Common.SomeOptionGenerator;
+            var gen = Generator.SomeOption;
 
             await gen.SampleAsync(async option =>
             {
@@ -1353,7 +1488,7 @@ public class Option_BindTask_Tests()
         public async Task None_returns_null()
         {
             // Act
-            var result = Common.NoneOption.IfNoneNull();
+            var result = Generator.NoneOption.IfNoneNull();
 
             // Assert
             await Assert.That(result)
@@ -1425,7 +1560,7 @@ public class Option_BindTask_Tests()
         public async Task None_does_not_execute_action()
         {
             // Arrange
-            var none = Common.NoneOption;
+            var none = Generator.NoneOption;
 
             var actionExecuted = false;
             void f(object _) => actionExecuted = true;
@@ -1471,7 +1606,7 @@ public class Option_BindTask_Tests()
         public async Task None_does_not_execute_action()
         {
             // Arrange
-            var none = Common.NoneOption;
+            var none = Generator.NoneOption;
 
             var actionExecuted = false;
             async ValueTask f(object _)

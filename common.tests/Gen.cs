@@ -125,10 +125,53 @@ internal static partial class Generator
                        .HashSet
                   where exceptions.Count > 0
                   select common.Error.From([.. exceptions]));
+    public static Gen<Option<object>> SomeOption { get; } =
+        from x in Object
+        select common.Option.Some(x);
+
+    public static Option<object> NoneOption { get; } = common.Option.None;
+
+    public static Gen<Option<object>> Option { get; } =
+        Gen.Frequency((9, SomeOption),
+                      (1, Gen.Const(NoneOption)));
+
+    public static Gen<Func<object, Option<object>>> ObjectToOption { get; } =
+        from predicate in ObjectPredicate
+        from f in ObjectToObject
+        select new Func<object, Option<object>>(x => predicate(x)
+                                                        ? common.Option.Some(f(x))
+                                                        : common.Option.None);
+
+    public static Gen<Result<object>> SuccessResult { get; } =
+        from value in Generator.Object
+        select new Result<object>(new Success<object>(value));
+
+    public static Gen<Result<object>> ErrorResult { get; } =
+         from error in Generator.Error
+         select new Result<object>(error);
+
+    public static Gen<Result<object>> Result { get; } =
+        Gen.OneOf(SuccessResult, ErrorResult);
+
+    public static Gen<Func<Error, Error>> ErrorToError { get; } =
+        from updatedError in Generator.Error
+        select new Func<Error, Error>(error => error + updatedError);
+
+    public static Gen<Func<Error, object>> ErrorToObject { get; } =
+        from f in Generator.ObjectToObject
+        select new Func<Error, object>(f);
+
+    public static Gen<Func<object, Result<object>>> ObjectToResult { get; } =
+        from predicate in Generator.ObjectPredicate
+        from f in Generator.ObjectToObject
+        from error in Generator.Error
+        select new Func<object, Result<object>>(x => predicate(x)
+                                                        ? common.Result.Success(f(x))
+                                                        : common.Result.Error<object>(error + common.Error.From($"Predicate failed for {x}")));
 
     public static Gen<Option<T>> OptionOf<T>(this Gen<T> gen) =>
         Gen.Frequency((9, gen.Select(common.Option.Some)),
-                      (1, Gen.Const(new Option<T>(Option.None))));
+                      (1, Gen.Const(new Option<T>(common.Option.None))));
     // public static Gen<Func<int, int>> IntToInt { get; } =
     //     Gen.OneOf(// Add x to the integer, ensuring that the output doesn't exceed the bounds of an int
     //               from x in Gen.Int

@@ -171,6 +171,31 @@ public static class Option
         option.Bind(t => f(t).Map(t2 => selector(t, t2)));
 
     /// <summary>
+    /// Matches the option and returns the result of the corresponding function.
+    /// </summary>
+    public static TResult Match<T, TResult>(this Option<T> option, Func<T, TResult> onSome, Func<TResult> onNone) =>
+        option switch
+        {
+            Some<T> { Value: var t } => onSome(t),
+            _ => onNone()
+        };
+
+    /// <summary>
+    /// Matches the option and executes the corresponding action.
+    /// </summary>
+    public static void Match<T>(this Option<T> option, Action<T> onSome, Action onNone)
+    {
+        if (option is Some<T> { Value: var t })
+        {
+            onSome(t);
+        }
+        else
+        {
+            onNone();
+        }
+    }
+
+    /// <summary>
     /// Returns the wrapped value if Some, otherwise the result of <paramref name="f"/>.
     /// </summary>
     public static T IfNone<T>(this Option<T> option, Func<T> f) =>

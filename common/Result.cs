@@ -162,6 +162,35 @@ public static class Result
               .Map(value2 => selector(value, value2)));
 
     /// <summary>
+    /// Matches the result and returns the result of the corresponding function.
+    /// </summary>
+    public static TResult Match<T, TResult>(this Result<T> result, Func<T, TResult> onSuccess, Func<Error, TResult> onError) =>
+        result switch
+        {
+            Success<T> { Value: var t } => onSuccess(t),
+            Error error => onError(error),
+            null => throw new InvalidOperationException("Result cannot be null.")
+        };
+
+    /// <summary>
+    /// Matches the result and executes the corresponding action.
+    /// </summary>
+    public static void Match<T>(this Result<T> result, Action<T> onSuccess, Action<Error> onError)
+    {
+        switch (result)
+        {
+            case Success<T> { Value: var t }:
+                onSuccess(t);
+                break;
+            case Error error:
+                onError(error);
+                break;
+            case null:
+                throw new InvalidOperationException("Result cannot be null.");
+        }
+    }
+
+    /// <summary>
     /// Returns the success value if successful, otherwise the result of <paramref name="f"/>.
     /// </summary>
     public static T IfError<T>(this Result<T> result, Func<Error, T> f) =>

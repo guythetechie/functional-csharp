@@ -1,9 +1,112 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Linq;
+using System.Runtime.CompilerServices;
+using System.Threading;
 using System.Threading.Tasks;
+using TUnit.Assertions.Conditions;
 using TUnit.Assertions.Core;
+using TUnit.Assertions.Enums;
 using TUnit.Assertions.Sources;
 
 namespace common.tests;
+
+public static class AsyncEnumerableAssertionExtensions
+{
+    private static CancellationToken CancellationToken => TestContext.Current?.Execution.CancellationToken ?? CancellationToken.None;
+
+    extension<T>(IAssertionSource<IAsyncEnumerable<T>> source)
+    {
+        public IsEquivalentToAssertion<ImmutableArray<T>, T> IsEquivalentTo(IEnumerable<T> expected, CollectionOrdering ordering = CollectionOrdering.Any, [CallerArgumentExpression(nameof(expected))] string? expectedExpression = null, [CallerArgumentExpression(nameof(ordering))] string? orderingExpression = null)
+        {
+            var context = source.Context;
+
+            context.ExpressionBuilder.Append(".IsEquivalentTo(");
+            context.ExpressionBuilder.Append(expectedExpression);
+
+            if (orderingExpression is not null)
+            {
+                context.ExpressionBuilder.Append(", ");
+                context.ExpressionBuilder.Append(orderingExpression);
+            }
+
+            context.ExpressionBuilder.Append(')');
+
+            var mappedContext = context.Map(Map);
+
+            return new(mappedContext, expected, ordering);
+        }
+
+        public AsyncEnumerableIsEquivalentToAssertion<T> IsEquivalentTo(IAsyncEnumerable<T> expected, CollectionOrdering ordering = CollectionOrdering.Any, [CallerArgumentExpression(nameof(expected))] string? expectedExpression = null, [CallerArgumentExpression(nameof(ordering))] string? orderingExpression = null)
+        {
+            var context = source.Context;
+
+            context.ExpressionBuilder.Append(".IsEquivalentTo(");
+            context.ExpressionBuilder.Append(expectedExpression);
+
+            if (orderingExpression is not null)
+            {
+                context.ExpressionBuilder.Append(", ");
+                context.ExpressionBuilder.Append(orderingExpression);
+            }
+
+            context.ExpressionBuilder.Append(')');
+
+            var mappedContext = context.Map(Map);
+            return new(mappedContext, expected, ordering);
+        }
+    }
+
+    extension<TCollection, T>(IAssertionSource<TCollection> source) where TCollection : IEnumerable<T>
+    {
+        public AsyncEnumerableIsEquivalentToAssertion<T> IsEquivalentTo(IAsyncEnumerable<T> expected, CollectionOrdering ordering = CollectionOrdering.Any, [CallerArgumentExpression(nameof(expected))] string? expectedExpression = null, [CallerArgumentExpression(nameof(ordering))] string? orderingExpression = null)
+        {
+            var context = source.Context;
+
+            context.ExpressionBuilder.Append(".IsEquivalentTo(");
+            context.ExpressionBuilder.Append(expectedExpression);
+
+            if (orderingExpression is not null)
+            {
+                context.ExpressionBuilder.Append(", ");
+                context.ExpressionBuilder.Append(orderingExpression);
+            }
+
+            context.ExpressionBuilder.Append(')');
+
+            var mappedContext = context.Map(tCollection =>
+            {
+                ArgumentNullException.ThrowIfNull(tCollection);
+                return tCollection.ToImmutableArray();
+            });
+
+            return new(mappedContext, expected, ordering);
+        }
+    }
+
+    private static async Task<ImmutableArray<T>> Map<T>(IAsyncEnumerable<T>? source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+
+        var array = await source.ToArrayAsync(CancellationToken);
+
+        return [.. array];
+    }
+
+    public class AsyncEnumerableIsEquivalentToAssertion<T>(AssertionContext<ImmutableArray<T>> context, IAsyncEnumerable<T> expected, CollectionOrdering ordering) : Assertion<ImmutableArray<T>>(context)
+    {
+        protected override string GetExpectation() => $"to be equivalent to the expected async enumerable.";
+
+        public override async Task<ImmutableArray<T>> AssertAsync()
+        {
+            var expectedArray = await expected.ToArrayAsync(CancellationToken);
+            var assertion = new IsEquivalentToAssertion<ImmutableArray<T>, T>(Context, expectedArray, ordering);
+
+            return await assertion.AssertAsync();
+        }
+    }
+}
 
 public sealed class ResultIsSuccessAssertion<T>(AssertionContext<Result<T>> context) : Assertion<Result<T>>(context)
 {
