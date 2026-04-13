@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
+using System.Text;
 
 namespace common;
 
@@ -68,21 +69,21 @@ public sealed record Error
                                          .. Exceptions])
         };
 
-    // /// <summary>
-    // /// Returns a string representation of the error, listing all messages and exceptions.
-    // /// </summary>
-    // public override string ToString()
-    // {
-    //     var builder = new StringBuilder();
+    /// <summary>
+    /// Returns a string representation of the error, listing all messages and exceptions.
+    /// </summary>
+    public override string ToString()
+    {
+        var builder = new StringBuilder();
 
-    //     Messages.Order().Iter(message => builder.AppendLine(message));
+        Messages.Order().Iter(message => builder.AppendLine(message));
 
-    //     Exceptions.Select(exception => $"{exception.GetType().Name}: {exception.Message}")
-    //               .Order()
-    //               .Iter(text => builder.AppendLine(text)); 
+        Exceptions.Select(exception => $"{exception.GetType().Name}: {exception.Message}")
+                  .Order()
+                  .Iter(text => builder.AppendLine(text));
 
-    //     return builder.ToString().Trim();
-    // }
+        return builder.ToString().Trim();
+    }
 
     /// <summary>
     /// Converts a message to an <see cref="Error"./>.
