@@ -1,7 +1,6 @@
 using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
-using System.Runtime.CompilerServices;
 
 namespace common;
 
@@ -17,60 +16,47 @@ public sealed record Success<T>(T Value)
 /// <summary>
 /// Represents the result of an operation that can either succeed with a value of type <typeparamref name="T"/> or fail with an <see cref="common.Error"/>.
 /// </summary>
-[Union]
-public sealed record Result<T> : IUnion
+public readonly union Result<T>(Success<T>, Error) : IEquatable<Result<T>>
 {
-    private readonly Success<T>? success;
-    private readonly Error? error;
+    public bool IsSuccess => this is Success<T>;
 
-    public Result(Success<T> success) =>
-        (IsSuccess, this.success) = (true, success);
-
-    public Result(Error error) =>
-        (IsSuccess, this.error) = (false, error);
-
-    public bool IsSuccess { get; }
-
-    public bool IsError => !IsSuccess;
-
-    public object? Value =>
-        IsSuccess ? success : error;
-
-    public bool HasValue =>
-        (IsSuccess && success is not null)
-        || (IsError && error is not null);
-
-    public bool TryGetValue([MaybeNullWhen(false)] out Success<T> value)
-    {
-        if (IsSuccess && success is not null)
-        {
-            value = success;
-            return true;
-        }
-
-        value = default;
-        return false;
-    }
-
-    public bool TryGetValue([MaybeNullWhen(false)] out Error error)
-    {
-        if (IsError && this.error is not null)
-        {
-            error = this.error;
-            return true;
-        }
-
-        error = default;
-        return false;
-    }
+    public bool IsError => this is Error;
 
     public static implicit operator Result<T>(Error error) =>
         new(error);
 
     public override string ToString() =>
-        IsSuccess
-        ? $"Success: {success?.Value?.ToString() ?? "<null>"}"
-        : $"Error: {error}";
+        this switch
+        {
+            null => "<null>",
+            Success<T> { Value: var value } => $"Success: {value}",
+            Error error => $"Error: {error}",
+        };
+
+    public override bool Equals([NotNullWhen(true)] object? obj) =>
+        obj is Result<T> other && Equals(other);
+
+    public bool Equals(Result<T> other) =>
+        (this, other) switch
+        {
+            (Error, Error) => true,
+            (Success<T> success1, Success<T> success2) => success1.Equals(success2),
+            _ => false
+        };
+
+    public override int GetHashCode() =>
+        this switch
+        {
+            Error => 0,
+            Success<T> success => success.GetHashCode(),
+            _ => 0
+        };
+
+    public static bool operator ==(Result<T> left, Result<T> right) =>
+        left.Equals(right);
+
+    public static bool operator !=(Result<T> left, Result<T> right) =>
+        !left.Equals(right);
 }
 
 public static class Result
@@ -217,9 +203,11 @@ public static class Result
     /// </summary>
     public static void IfError<T>(this Result<T> result, Action<Error> f)
     {
-        if (result is Error error)
+        switch (result)
         {
-            f(error);
+            case Error error:
+                f(error);
+                break;
         }
     }
 
@@ -250,9 +238,11 @@ public static class Result
     /// </summary>
     public static async ValueTask IfErrorTask<T>(this Result<T> result, Func<Error, ValueTask> f)
     {
-        if (result is Error error)
+        switch (result)
         {
-            await f(error);
+            case Error error:
+                await f(error);
+                break;
         }
     }
 

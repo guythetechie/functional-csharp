@@ -1,7 +1,6 @@
 ﻿using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
-using System.Runtime.CompilerServices;
 
 namespace common;
 
@@ -25,68 +24,50 @@ public sealed record Some<T>(T Value)
         $"Some({Value})";
 }
 
-[Union]
 /// <summary>
 /// Represents a type that may or may not contain a value of type <typeparamref name="T"/>.
 /// </summary>
-public sealed record Option<T> : IUnion
+public readonly union Option<T>(Some<T>, None) : IEquatable<Option<T>>
 {
-    private readonly Some<T>? some;
+    public bool IsSome => this is Some<T>;
 
-    /// <summary>
-    /// Creates an option containing <paramref name="some"/>.
-    /// </summary>
-    public Option(Some<T> some) =>
-        (IsSome, this.some) = (true, some);
-
-    /// <summary>
-    /// Creates an option containing no value.
-    /// </summary>
-    /// <param name="_"></param>
-    public Option(None _) =>
-        IsSome = false;
-
-    public bool IsSome { get; }
-
-    public bool IsNone => !IsSome;
-
-    public object? Value =>
-        IsSome ? some : new None();
-
-    public bool HasValue =>
-        !IsSome || some is not null;
-
-    public bool TryGetValue([MaybeNullWhen(false)] out Some<T> value)
-    {
-        if (IsSome && some is not null)
-        {
-            value = some;
-            return true;
-        }
-
-        value = default;
-        return false;
-    }
-
-    public bool TryGetValue([MaybeNullWhen(false)] out None value)
-    {
-        if (IsNone)
-        {
-            value = new None();
-            return true;
-        }
-
-        value = default;
-        return false;
-    }
+    public bool IsNone => this is None;
 
     public static implicit operator Option<T>(None none) =>
         new(none);
 
     public override string ToString() =>
-        IsSome
-        ? some?.ToString() ?? "<null>"
-         : "None";
+        this switch
+        {
+            null => "<null>",
+            Some<T> { Value: var value } => $"Some: {value}",
+            None => "None",
+        };
+
+    public override bool Equals([NotNullWhen(true)] object? obj) =>
+        obj is Option<T> other && Equals(other);
+
+    public bool Equals(Option<T> other) =>
+        (this, other) switch
+        {
+            (None, None) => true,
+            (Some<T> some1, Some<T> some2) => some1.Equals(some2),
+            _ => false
+        };
+
+    public override int GetHashCode() =>
+        this switch
+        {
+            None => 0,
+            Some<T> some => some.GetHashCode(),
+            _ => 0
+        };
+
+    public static bool operator ==(Option<T> left, Option<T> right) =>
+        left.Equals(right);
+
+    public static bool operator !=(Option<T> left, Option<T> right) =>
+        !left.Equals(right);
 }
 
 public static class Option
