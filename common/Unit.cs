@@ -1,8 +1,7 @@
 namespace common;
 
 /// <summary>
-/// Represents the absence of a meaningful value. Used as a functional equivalent 
-/// of void that can be used in generic contexts.
+/// Represents the absence of a meaningful value. Methods can return this type instead of void.
 /// </summary>
 public readonly record struct Unit
 {

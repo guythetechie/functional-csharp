@@ -64,6 +64,9 @@ csharp_style_expression_bodied_local_functions = when_on_single_line
 # IDE0072: Add missing cases
 dotnet_diagnostic.IDE0072.severity = suggestion
 
+# IDE0100: Remove unnecessary equality operator
+dotnet_diagnostic.IDE0100.severity = suggestion
+
 # IDE0160: Convert to block scoped namespace
 csharp_style_namespace_declarations = file_scoped
 

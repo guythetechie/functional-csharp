@@ -4,10 +4,14 @@
     <TargetFramework>net11.0</TargetFramework>
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <WarningsNotAsErrors>IDE0055</WarningsNotAsErrors>
     <AnalysisLevel>latest-all</AnalysisLevel>
     <LangVersion>preview</LangVersion>
     <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CsCheck" Version="4.6.2" />
+    <PackageReference Include="TUnit.Assertions" Version="1.43.11" />
+  </ItemGroup>
 
 </Project>

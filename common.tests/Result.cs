@@ -15,7 +15,7 @@ public class SuccessT_ToString_Tests()
         await gen.SampleAsync(async value =>
         {
             // Arrange
-            var success = new Success<object>(value);
+            var success = new Result<object>.Success(value);
 
             // Act
             var result = success.ToString();
@@ -34,7 +34,7 @@ public class ResultT_Error_ImplicitOperator_Tests()
     [Test]
     public async Task Implicitly_converts_Error_to_a_result_in_the_error_state()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -60,7 +60,7 @@ public class ResultT_ToString_Tests
         await gen.SampleAsync(async value =>
         {
             // Arrange
-            var success = new Success<object>(value);
+            var success = new Result<object>.Success(value);
             var result = new Result<object>(success);
 
             // Act
@@ -77,7 +77,7 @@ public class ResultT_ToString_Tests
     [Test]
     public async Task Error_returns_Error_with_value()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -101,7 +101,7 @@ public class ResultT_Equality_Tests
     [Test]
     public async Task Equality_is_reflexive()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -120,13 +120,13 @@ public class ResultT_Equality_Tests
     public async Task Equality_is_symmetric()
     {
         var gen = from x1 in Generator.Object
-                  from error1 in Generator.Error
+                  from error1 in ErrorGenerator.Any
                   from x2 in Generator.Object
-                  from error2 in Generator.Error
+                  from error2 in ErrorGenerator.Any
                   let resultGenerator =
-                    Gen.OneOfConst(new Result<object>(new Success<object>(x1)),
+                    Gen.OneOfConst(new Result<object>(new Result<object>.Success(x1)),
                                    new Result<object>(error1),
-                                   new Result<object>(new Success<object>(x2)),
+                                   new Result<object>(new Result<object>.Success(x2)),
                                    new Result<object>(error2))
                   from result1 in resultGenerator
                   from result2 in resultGenerator
@@ -150,13 +150,13 @@ public class ResultT_Equality_Tests
     public async Task Equality_is_transitive()
     {
         var gen = from x1 in Generator.Object
-                  from error1 in Generator.Error
+                  from error1 in ErrorGenerator.Any
                   from x2 in Generator.Object
-                  from error2 in Generator.Error
+                  from error2 in ErrorGenerator.Any
                   let resultGenerator =
-                    Gen.OneOfConst(new Result<object>(new Success<object>(x1)),
+                    Gen.OneOfConst(new Result<object>(new Result<object>.Success(x1)),
                                    new Result<object>(error1),
-                                   new Result<object>(new Success<object>(x2)),
+                                   new Result<object>(new Result<object>.Success(x2)),
                                    new Result<object>(error2))
                   from result1 in resultGenerator
                   from result2 in resultGenerator
@@ -207,7 +207,7 @@ public class Result_Error_Tests()
     [Test]
     public async Task Returns_a_result_in_the_error_state()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -228,7 +228,7 @@ public class Result_Map_Tests()
     [Test]
     public async Task Satisfies_functor_identity()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -244,9 +244,9 @@ public class Result_Map_Tests()
     [Test]
     public async Task Satisfies_functor_composition()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ObjectToObject
                   select (result, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -269,8 +269,8 @@ public class Result_Map_Tests()
     [Test]
     public async Task Satisfies_bind_then_return()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
                   select (result, f);
 
         await gen.SampleAsync(async tuple =>
@@ -294,7 +294,7 @@ public class Result_MapTask_Tests()
     [Test]
     public async Task Satisfies_functor_identity()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -317,14 +317,14 @@ public class Result_MapTask_Tests()
     [Test]
     public async Task Satisfies_functor_composition()
     {
-        var gen = from result in Generator.Result
-                  from f1 in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f1 in MapperGenerator.ObjectToObject
                   let f = new Func<object, ValueTask<object>>(async x =>
                   {
                       await Task.Yield();
                       return f1(x);
                   })
-                  from g1 in Generator.ObjectToObject
+                  from g1 in MapperGenerator.ObjectToObject
                   let g = new Func<object, ValueTask<object>>(async x =>
                   {
                       await Task.Yield();
@@ -351,8 +351,8 @@ public class Result_MapTask_Tests()
     [Test]
     public async Task Satisfies_BindTask_then_Return()
     {
-        var gen = from result in Generator.Result
-                  from f1 in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f1 in MapperGenerator.ObjectToObject
                   let f = new Func<object, ValueTask<object>>(async x =>
                   {
                       await Task.Yield();
@@ -386,7 +386,7 @@ public class Result_MapError_Tests()
     [Test]
     public async Task Satisfies_functor_identity()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -402,9 +402,9 @@ public class Result_MapError_Tests()
     [Test]
     public async Task Satisfies_functor_composition()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ErrorToError
-                  from g in Generator.ErrorToError
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ErrorToError
+                  from g in MapperGenerator.ErrorToError
                   select (result, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -427,9 +427,9 @@ public class Result_MapError_Tests()
     [Test]
     public async Task Map_and_MapError_are_independent()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ErrorToError
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ErrorToError
                   select (result, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -457,7 +457,7 @@ public class Result_Bind_Tests()
     public async Task Satisfies_monad_left_identity()
     {
         var gen = from x in Generator.Object
-                  from f in Generator.ObjectToResult
+                  from f in MapperGenerator.ObjectToResult
                   select (x, f);
 
         await gen.SampleAsync(async tuple =>
@@ -479,7 +479,7 @@ public class Result_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_right_identity()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -495,9 +495,9 @@ public class Result_Bind_Tests()
     [Test]
     public async Task Satisfies_monad_associativity()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToResult
-                  from g in Generator.ObjectToResult
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
+                  from g in MapperGenerator.ObjectToResult
                   select (result, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -520,8 +520,8 @@ public class Result_Bind_Tests()
     [Test]
     public async Task Error_result_returns_original_error()
     {
-        var gen = from error in Generator.Error
-                  from f in Generator.ObjectToResult
+        var gen = from error in ErrorGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
                   select (error, f);
 
         await gen.SampleAsync(async tuple =>
@@ -548,7 +548,7 @@ public class Result_BindTask_Tests()
     public async Task Satisfies_monad_left_identity()
     {
         var gen = from x in Generator.Object
-                  from f1 in Generator.ObjectToResult
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<object, ValueTask<Result<object>>>(async x =>
                   {
                       await Task.Yield();
@@ -575,7 +575,7 @@ public class Result_BindTask_Tests()
     [Test]
     public async Task Satisfies_monad_right_identity()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -598,14 +598,14 @@ public class Result_BindTask_Tests()
     [Test]
     public async Task Satisfies_monad_associativity()
     {
-        var gen = from result in Generator.Result
-                  from f1 in Generator.ObjectToResult
+        var gen = from result in ResultGenerator.Any
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<object, ValueTask<Result<object>>>(async x =>
                   {
                       await Task.Yield();
                       return f1(x);
                   })
-                  from g1 in Generator.ObjectToResult
+                  from g1 in MapperGenerator.ObjectToResult
                   let g = new Func<object, ValueTask<Result<object>>>(async x =>
                   {
                       await Task.Yield();
@@ -635,8 +635,8 @@ public class Result_Select_Tests()
     [Test]
     public async Task LINQ_is_syntactic_sugar_for_map()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
                   select (result, f);
 
         await gen.SampleAsync(async tuple =>
@@ -666,10 +666,10 @@ public class Result_SelectMany_Tests()
     [Test]
     public async Task LINQ_is_syntactic_sugar_for_bind()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToResult
-                  from g1 in Generator.ObjectToObject
-                  from g2 in Generator.ObjectToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
+                  from g1 in MapperGenerator.ObjectToObject
+                  from g2 in MapperGenerator.ObjectToObject
                       // Nothing special, just a repeatable function with two parameters
                   let g = new Func<object, object, object>((x, y) => g2(g1(x).ToString() + y.ToString()))
                   select (result, f, g);
@@ -703,8 +703,8 @@ public class Result_Match_Tests()
     public async Task Success_returns_success_function_result()
     {
         var gen = from x in Generator.Object
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ErrorToObject
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ErrorToObject
                   select (x, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -725,9 +725,9 @@ public class Result_Match_Tests()
     [Test]
     public async Task Error_returns_error_function_result()
     {
-        var gen = from error in Generator.Error
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ErrorToObject
+        var gen = from error in ErrorGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ErrorToObject
                   select (error, f, g);
 
         await gen.SampleAsync(async tuple =>
@@ -748,7 +748,7 @@ public class Result_Match_Tests()
     [Test]
     public async Task Reconstructs_original_result()
     {
-        var gen = Generator.Result;
+        var gen = ResultGenerator.Any;
 
         await gen.SampleAsync(async result =>
         {
@@ -765,10 +765,10 @@ public class Result_Match_Tests()
     [Test]
     public async Task Fuses_with_Map()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ObjectToObject
-                  from h in Generator.ErrorToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ObjectToObject
+                  from h in MapperGenerator.ErrorToObject
                   select (result, f, g, h);
 
         await gen.SampleAsync(async tuple =>
@@ -791,10 +791,10 @@ public class Result_Match_Tests()
     [Test]
     public async Task Fuses_with_MapError()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToObject
-                  from g in Generator.ErrorToError
-                  from h in Generator.ErrorToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  from g in MapperGenerator.ErrorToError
+                  from h in MapperGenerator.ErrorToObject
                   select (result, f, g, h);
 
         await gen.SampleAsync(async tuple =>
@@ -817,10 +817,10 @@ public class Result_Match_Tests()
     [Test]
     public async Task Fuses_with_Bind()
     {
-        var gen = from result in Generator.Result
-                  from f in Generator.ObjectToResult
-                  from g in Generator.ObjectToObject
-                  from h in Generator.ErrorToObject
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
+                  from g in MapperGenerator.ObjectToObject
+                  from h in MapperGenerator.ErrorToObject
                   select (result, f, g, h);
 
         await gen.SampleAsync(async tuple =>
@@ -874,7 +874,7 @@ public class Result_Match_WithAction_Tests()
     [Test]
     public async Task Error_executes_error_action()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -927,8 +927,8 @@ public class Result_IfError_WithValueFallback_Tests()
     [Test]
     public async Task Error_returns_the_fallback()
     {
-        var gen = from error in Generator.Error
-                  from f1 in Generator.ObjectToObject
+        var gen = from error in ErrorGenerator.Any
+                  from f1 in MapperGenerator.ObjectToObject
                   let f = new Func<Error, object>(f1)
                   select (error, f);
 
@@ -954,7 +954,7 @@ public class IfError_WithResultFallback_Tests()
     public async Task Success_returns_the_original_result()
     {
         var gen = from x in Generator.Object
-                  from f1 in Generator.ObjectToResult
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, Result<object>>(f1)
                   select (x, f);
 
@@ -978,8 +978,8 @@ public class IfError_WithResultFallback_Tests()
     [Test]
     public async Task Error_returns_the_fallback_result()
     {
-        var gen = from error in Generator.Error
-                  from f1 in Generator.ObjectToResult
+        var gen = from error in ErrorGenerator.Any
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, Result<object>>(f1)
                   select (error, f);
 
@@ -1001,10 +1001,10 @@ public class IfError_WithResultFallback_Tests()
     [Test]
     public async Task Satisfies_recovery_associativity()
     {
-        var gen = from result in Generator.Result
-                  from f1 in Generator.ObjectToResult
+        var gen = from result in ResultGenerator.Any
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, Result<object>>(f1)
-                  from g1 in Generator.ObjectToResult
+                  from g1 in MapperGenerator.ObjectToResult
                   let g = new Func<Error, Result<object>>(g1)
                   select (result, f, g);
 
@@ -1026,12 +1026,12 @@ public class IfError_WithResultFallback_Tests()
     }
 }
 
-public class IfError_WithAction_Tests()
+public class Result_IterError_Tests()
 {
     [Test]
     public async Task Success_does_not_execute_action()
     {
-        var gen = Generator.SuccessResult;
+        var gen = ResultGenerator.Success;
 
         await gen.SampleAsync(async result =>
         {
@@ -1040,7 +1040,7 @@ public class IfError_WithAction_Tests()
             void f(Error error) => actionExecuted = true;
 
             // Act
-            result.IfError(f);
+            result.IterError(f);
 
             // Assert
             await Assert.That(actionExecuted)
@@ -1051,7 +1051,7 @@ public class IfError_WithAction_Tests()
     [Test]
     public async Task Error_executes_action()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -1059,10 +1059,10 @@ public class IfError_WithAction_Tests()
             var result = Result.Error<object>(error);
 
             var observedError = default(Error);
-            var f = (Error error) => observedError = error;
+            Action<Error> f = e => observedError = e;
 
             // Act
-            result.IfError(f);
+            result.IterError(f);
 
             // Assert
             await Assert.That(observedError)
@@ -1103,8 +1103,8 @@ public class IfErrorTask_WithValueFallback_Tests()
     [Test]
     public async Task Error_returns_the_fallback()
     {
-        var gen = from error in Generator.Error
-                  from f1 in Generator.ObjectToObject
+        var gen = from error in ErrorGenerator.Any
+                  from f1 in MapperGenerator.ObjectToObject
                   let f = new Func<Error, ValueTask<object>>(async error =>
                   {
                       await Task.Yield();
@@ -1134,7 +1134,7 @@ public class IfErrorTask_WithResultFallback_Tests()
     public async Task Success_returns_the_original_result()
     {
         var gen = from x in Generator.Object
-                  from f1 in Generator.ObjectToResult
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, ValueTask<Result<object>>>(async error =>
                   {
                       await Task.Yield();
@@ -1162,8 +1162,8 @@ public class IfErrorTask_WithResultFallback_Tests()
     [Test]
     public async Task Error_returns_the_fallback_result()
     {
-        var gen = from error in Generator.Error
-                  from f1 in Generator.ObjectToResult
+        var gen = from error in ErrorGenerator.Any
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, ValueTask<Result<object>>>(async error =>
                   {
                       await Task.Yield();
@@ -1189,14 +1189,14 @@ public class IfErrorTask_WithResultFallback_Tests()
     [Test]
     public async Task Satisfies_recovery_associativity()
     {
-        var gen = from result in Generator.Result
-                  from f1 in Generator.ObjectToResult
+        var gen = from result in ResultGenerator.Any
+                  from f1 in MapperGenerator.ObjectToResult
                   let f = new Func<Error, ValueTask<Result<object>>>(async error =>
                   {
                       await Task.Yield();
                       return f1(error);
                   })
-                  from g1 in Generator.ObjectToResult
+                  from g1 in MapperGenerator.ObjectToResult
                   let g = new Func<Error, ValueTask<Result<object>>>(async error =>
                   {
                       await Task.Yield();
@@ -1221,12 +1221,12 @@ public class IfErrorTask_WithResultFallback_Tests()
     }
 }
 
-public class IfErrorTask_WithAction_Tests()
+public class Result_IterErrorTask_Tests()
 {
     [Test]
     public async Task Success_does_not_execute_action()
     {
-        var gen = Generator.SuccessResult;
+        var gen = ResultGenerator.Success;
 
         await gen.SampleAsync(async result =>
         {
@@ -1239,7 +1239,7 @@ public class IfErrorTask_WithAction_Tests()
             }
 
             // Act
-            await result.IfErrorTask(f);
+            await result.IterErrorTask(f);
 
             // Assert
             await Assert.That(actionExecuted)
@@ -1250,7 +1250,7 @@ public class IfErrorTask_WithAction_Tests()
     [Test]
     public async Task Error_executes_action()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -1265,7 +1265,7 @@ public class IfErrorTask_WithAction_Tests()
             }
 
             // Act
-            await result.IfErrorTask(f);
+            await result.IterErrorTask(f);
 
             // Assert
             await Assert.That(observedError)
@@ -1298,7 +1298,7 @@ public class Result_IfErrorThrow_Tests()
     [Test]
     public async Task Error_throws_an_exception()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -1342,7 +1342,7 @@ public class Result_IfErrorNull_Tests()
     [Test]
     public async Task Error_returns_null()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -1383,7 +1383,7 @@ public class Result_IfErrorNullable_Tests()
     [Test]
     public async Task Error_returns_null()
     {
-        var gen = Generator.Error;
+        var gen = ErrorGenerator.Any;
 
         await gen.SampleAsync(async error =>
         {
@@ -1427,7 +1427,7 @@ public class Result_Iter_Tests()
     [Test]
     public async Task Error_result_does_not_execute_action()
     {
-        var gen = Generator.ErrorResult;
+        var gen = ResultGenerator.Error;
 
         await gen.SampleAsync(async result =>
         {
@@ -1476,7 +1476,7 @@ public class Result_IterTask_Tests()
     [Test]
     public async Task Error_result_does_not_execute_action()
     {
-        var gen = Generator.ErrorResult;
+        var gen = ResultGenerator.Error;
 
         await gen.SampleAsync(async result =>
         {
@@ -1524,7 +1524,7 @@ public class Result_ToOption_Tests()
     [Test]
     public async Task Error_result_returns_None()
     {
-        var gen = Generator.ErrorResult;
+        var gen = ResultGenerator.Error;
 
         await gen.SampleAsync(async result =>
         {
@@ -1534,6 +1534,271 @@ public class Result_ToOption_Tests()
             // Assert
             await Assert.That(option)
                         .IsNone();
+        });
+    }
+}
+
+public class Result_Tap_Tests
+{
+    [Test]
+    public async Task Returns_original_result()
+    {
+        var gen = from result in ResultGenerator.Any
+                  from f in MapperGenerator.ObjectToObject
+                  select (result, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (result, f) = tuple;
+
+            // Act
+            var tapped = result.Tap(x => { _ = f(x); });
+
+            // Assert
+            await Assert.That(tapped)
+                        .IsEqualTo(result);
+        });
+    }
+
+    [Test]
+    public async Task Success_executes_action()
+    {
+        var gen = Generator.Object;
+
+        await gen.SampleAsync(async x =>
+        {
+            // Arrange
+            var result = Result.Success(x);
+            object? observed = null;
+
+            // Act
+            result.Tap(value => observed = value);
+
+            // Assert
+            await Assert.That(observed)
+                        .IsEqualTo(x);
+        });
+    }
+
+    [Test]
+    public async Task Error_does_not_execute_action()
+    {
+        var gen = ResultGenerator.Error;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            var actionExecuted = false;
+
+            // Act
+            result.Tap(_ => actionExecuted = true);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
+        });
+    }
+}
+
+public class Result_TapTask_Tests
+{
+    [Test]
+    public async Task Returns_original_result()
+    {
+        var gen = ResultGenerator.Any;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            static async ValueTask f(object x) => await Task.Yield();
+
+            // Act
+            var tapped = await result.TapTask(f);
+
+            // Assert
+            await Assert.That(tapped)
+                        .IsEqualTo(result);
+        });
+    }
+
+    [Test]
+    public async Task Success_executes_action()
+    {
+        var gen = Generator.Object;
+
+        await gen.SampleAsync(async x =>
+        {
+            // Arrange
+            var result = Result.Success(x);
+            object? observed = null;
+
+            async ValueTask f(object value)
+            {
+                await Task.Yield();
+                observed = value;
+            }
+
+            // Act
+            await result.TapTask(f);
+
+            // Assert
+            await Assert.That(observed)
+                        .IsEqualTo(x);
+        });
+    }
+
+    [Test]
+    public async Task Error_does_not_execute_action()
+    {
+        var gen = ResultGenerator.Error;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            var actionExecuted = false;
+            async ValueTask f(object _)
+            {
+                await Task.Yield();
+                actionExecuted = true;
+            }
+
+            // Act
+            await result.TapTask(f);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
+        });
+    }
+}
+
+public class Result_TapError_Tests
+{
+    [Test]
+    public async Task Returns_original_result()
+    {
+        var gen = ResultGenerator.Any;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Act
+            var tapped = result.TapError(_ => { });
+
+            // Assert
+            await Assert.That(tapped)
+                        .IsEqualTo(result);
+        });
+    }
+
+    [Test]
+    public async Task Error_executes_action()
+    {
+        var gen = ErrorGenerator.Any;
+
+        await gen.SampleAsync(async error =>
+        {
+            // Arrange
+            var result = Result.Error<object>(error);
+            var observedError = default(Error);
+
+            // Act
+            result.TapError(e => observedError = e);
+
+            // Assert
+            await Assert.That(observedError)
+                        .IsEqualTo(error);
+        });
+    }
+
+    [Test]
+    public async Task Success_does_not_execute_action()
+    {
+        var gen = ResultGenerator.Success;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            var actionExecuted = false;
+
+            // Act
+            result.TapError(_ => actionExecuted = true);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
+        });
+    }
+}
+
+public class Result_TapErrorTask_Tests
+{
+    [Test]
+    public async Task Returns_original_result()
+    {
+        var gen = ResultGenerator.Any;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            static async ValueTask f(Error _) => await Task.Yield();
+
+            // Act
+            var tapped = await result.TapErrorTask(f);
+
+            // Assert
+            await Assert.That(tapped)
+                        .IsEqualTo(result);
+        });
+    }
+
+    [Test]
+    public async Task Error_executes_action()
+    {
+        var gen = ErrorGenerator.Any;
+
+        await gen.SampleAsync(async error =>
+        {
+            // Arrange
+            var result = Result.Error<object>(error);
+            var observedError = default(Error);
+
+            async ValueTask f(Error e)
+            {
+                await Task.Yield();
+                observedError = e;
+            }
+
+            // Act
+            await result.TapErrorTask(f);
+
+            // Assert
+            await Assert.That(observedError)
+                        .IsEqualTo(error);
+        });
+    }
+
+    [Test]
+    public async Task Success_does_not_execute_action()
+    {
+        var gen = ResultGenerator.Success;
+
+        await gen.SampleAsync(async result =>
+        {
+            // Arrange
+            var actionExecuted = false;
+            async ValueTask f(Error _)
+            {
+                await Task.Yield();
+                actionExecuted = true;
+            }
+
+            // Act
+            await result.TapErrorTask(f);
+
+            // Assert
+            await Assert.That(actionExecuted)
+                        .IsFalse();
         });
     }
 }
