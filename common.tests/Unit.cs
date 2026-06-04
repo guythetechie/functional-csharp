@@ -35,7 +35,7 @@ public class Unit_Equality_Tests
 public class Unit_ToString_Tests
 {
     [Test]
-    public async Task Returns_open_close_paren()
+    public async Task Returns_expected_value()
     {
         // Act
         var text = Unit.Instance.ToString();

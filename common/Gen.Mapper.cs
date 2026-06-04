@@ -60,6 +60,7 @@ public static class MapperGenerator
                   from f in IntToString
                   from g in StringToInt
                   select new Func<object, object>(x => f(g(x.ToString()))));
+                  
     public static Gen<Func<object, Option<object>>> ObjectToOption { get; } =
         from predicate in ObjectPredicate
         from f in ObjectToObject
