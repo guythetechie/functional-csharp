@@ -666,6 +666,80 @@ public class Option_Bind_Tests()
     }
 }
 
+public class Option_Traverse_WithResult_Tests
+{
+    [Test]
+    public async Task Satisfies_identity()
+    {
+        var gen = OptionGenerator.Any;
+
+        await gen.SampleAsync(async option =>
+        {
+            // Act
+            var result = option.Traverse(Result.Success);
+
+            // Assert
+            await Assert.That(result)
+                        .IsSuccess()
+                        .WhoseValue
+                        .IsEqualTo(option);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_composition()
+    {
+        var gen = from option in OptionGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
+                  from g in MapperGenerator.ObjectToOption
+                  select (option, f, g);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f, g) = tuple;
+
+            // Act
+            var result1 = option.Traverse(x => f(x).Map(g))
+                                .Map(value => value.Match(t => t.Map(Option.Some),
+                                                          () => Option.Some(Option<object>.None)));
+
+            var result2 = option.Traverse(f)
+                                .Map(value => value.Match(t => g(t).Map(Option.Some),
+                                                          () => Option.Some(Option<object>.None)));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Satisfies_naturality()
+    {
+        var gen = from option in OptionGenerator.Any
+                  from f in MapperGenerator.ObjectToResult
+                  select (option, f);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (option, f) = tuple;
+
+            // Act
+            var result1 = option.Traverse(f)
+                                .ToOption();
+
+            var result2 = option.Match(t => f(t).ToOption().Map(Option.Some),
+                                       () => Option.Some(Option<object>.None));
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+}
+
 public class Option_BindTask_Tests()
 {
     [Test]

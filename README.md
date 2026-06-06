@@ -110,6 +110,25 @@ static Option<User> FindUserById(string id) =>
         : Option.None;
 ```
 
+#### `Result<Option<T2>> Traverse<T2>(Func<T, Result<T2>> f)`
+Applies `f` to the wrapped value and flips the nested `Option` and `Result`.
+
+```csharp
+Option<string> input = Option.Some("42");
+Result<Option<int>> parsed = input.Traverse(ParseInt); // Success(Some(42))
+
+Option<string> missing = Option.None;
+Result<Option<int>> missingParsed = missing.Traverse(ParseInt); // Success(None)
+
+Option<string> invalid = Option.Some("nope");
+Result<Option<int>> invalidParsed = invalid.Traverse(ParseInt); // Error("Invalid number")
+
+static Result<int> ParseInt(string value) =>
+    int.TryParse(value, out var number)
+        ? Result.Success(number)
+        : Result.Error<int>(Error.From("Invalid number"));
+```
+
 #### `ValueTask<Option<T2>> BindTask<T2>(Func<T, ValueTask<Option<T2>>> f)`
 Applies `f` and flattens the result.
 

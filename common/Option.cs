@@ -158,6 +158,14 @@ public static class Option
         option.Match(f, () => None);
 
     /// <summary>
+    /// Applies <paramref name="f"/> to the wrapped value and flips the nested <see cref="Option{T}"/> and <see cref="Result{T}"/>.
+    /// </summary>
+    /// <returns><c>Success(Some(f(value)))</c> if Some and <paramref name="f"/> succeeds, <c>Success(None)</c> if None, or the returned error if <paramref name="f"/> fails.</returns>
+    public static Result<Option<T2>> Traverse<T, T2>(this Option<T> option, Func<T, Result<T2>> f) =>
+        option.Match(t => f(t).Map(Option.Some),
+                     () => Result.Success(Option<T2>.None));
+
+    /// <summary>
     /// Applies <paramref name="f"/> and flattens the result.
     /// </summary>
     /// <returns><c>await f(value)</c> if Some, otherwise <see cref="common.None"/>.</returns>
