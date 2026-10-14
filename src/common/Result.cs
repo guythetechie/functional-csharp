@@ -315,4 +315,60 @@ public static class Result
     /// <seealso cref="Option.ToResult{T}(Option{T}, Func{Error})"/>
     public static Option<T> ToOption<T>(this Result<T> result) =>
         result.Match(Option.Some, _ => Option.None);
+
+    /// <summary>
+    /// LINQ projection support for <see cref="ValueTask{TResult}"/>-wrapped results. Enables syntax <c>from value in resultTask select f(value)</c>.
+    /// </summary>
+    /// <returns><c>Success(f(value))</c> if successful, otherwise the original error.</returns>
+    public static async ValueTask<Result<T2>> Select<T, T2>(this ValueTask<Result<T>> resultTask, Func<T, T2> f)
+    {
+        var result = await resultTask;
+        return result.Map(f);
+    }
+
+    /// <summary>
+    /// LINQ flattening support for <see cref="ValueTask{TResult}"/>-wrapped results. Enables syntax
+    /// <c>from x in resultTask1 from y in resultTask2 select x + y</c>.
+    /// </summary>
+    /// <returns>The combined success, or the first error encountered.</returns>
+    public static async ValueTask<Result<TResult>> SelectMany<T, T2, TResult>(this ValueTask<Result<T>> resultTask,
+                                                                         Func<T, ValueTask<Result<T2>>> f,
+                                                                         Func<T, T2, TResult> selector)
+    {
+        var result = await resultTask;
+        return await result.BindTask(t => f(t).Select(t2 => selector(t, t2)));
+    }
+
+    /// <summary>
+    /// Lifts the result of <paramref name="f"/> into a <see cref="Result{T}"/>.
+    /// </summary>
+    public static async ValueTask<Result<T>> ToAsync<T>(Func<ValueTask<T>> f)
+    {
+        var t = await f();
+        return Success(t);
+    }
+
+    /// <summary>
+    /// Lifts the result of <paramref name="f"/> into a <see cref="Result{T}"/>.
+    /// </summary>
+    public static async ValueTask<Result<T>> ToAsync<T>(Func<ValueTask<Result<T>>> f) =>
+        await f();
+
+    /// <summary>
+    /// Lifts the result of <paramref name="f"/> into a <see cref="Result{T}"/>.
+    /// </summary>
+    public static async ValueTask<Result<T>> ToAsync<T>(Func<Result<T>> f)
+    {
+        await ValueTask.CompletedTask;
+        return f();
+    }
+
+    /// <summary>
+    /// Lifts a task into a successful <see cref="Result{Unit}"/>.
+    /// </summary>
+    public static async ValueTask<Result<Unit>> ToAsync(Func<ValueTask> f)
+    {
+        await f();
+        return Success(Unit.Instance);
+    }
 }

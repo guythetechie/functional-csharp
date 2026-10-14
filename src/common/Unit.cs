@@ -1,3 +1,6 @@
+using System;
+using System.Threading.Tasks;
+
 namespace common;
 
 /// <summary>
@@ -10,4 +13,16 @@ public readonly record struct Unit
     public override string ToString() => "()";
 
     public override int GetHashCode() => 0;
+    
+    public static Unit From(Action action)
+    {
+        action();
+        return Instance;
+    }
+
+    public static async ValueTask<Unit> From(Func<ValueTask> action)
+    {
+        await action();
+        return Instance;
+    }
 }

@@ -46,20 +46,13 @@ public readonly union Option<T>(Option<T>.Some, None) : IEquatable<Option<T>>
     /// <summary>
     /// Matches the option and executes the corresponding action.
     /// </summary>
-    public void Match(Action<T> onSome, Action onNone)
-    {
-        switch (this)
+    public void Match(Action<T> onSome, Action onNone) =>
+        _ = this switch
         {
-            case Some { Value: var t }:
-                onSome(t);
-                break;
-            case common.None:
-                onNone();
-                break;
-            case null:
-                throw new UnreachableException($"Option cannot be null");
-        }
-    }
+            Some { Value: var t } => Unit.From(() => onSome(t)),
+            common.None => Unit.From(onNone),
+            null => throw new UnreachableException($"Option cannot be null")
+        };
 
     public override string ToString() =>
         this switch
@@ -84,7 +77,7 @@ public readonly union Option<T>(Option<T>.Some, None) : IEquatable<Option<T>>
         this switch
         {
             Some some => some.GetHashCode(),
-            _ => 0
+            common.None => 0
         };
 
     public static implicit operator Option<T>(None none) =>
