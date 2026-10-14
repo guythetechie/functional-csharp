@@ -9,7 +9,7 @@ using TUnit.Assertions.Conditions;
 using TUnit.Assertions.Core;
 using TUnit.Assertions.Enums;
 
-namespace common;
+namespace common.tests;
 
 public class AsyncEnumerableIsEquivalentToAssertion<T>(AssertionContext<ImmutableArray<T>> context, IAsyncEnumerable<T> expected, CollectionOrdering ordering, CancellationToken cancellationToken = default) : Assertion<ImmutableArray<T>>(context)
 {

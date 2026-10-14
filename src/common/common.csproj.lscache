@@ -68,14 +68,7 @@ TemporaryDependencyNodeTargetIdentifier=net11.0
 /warnaserror+:NU1605,SYSLIB0011
 
 [sourceFiles]
-obj/Debug/net11.0/
- .NETCoreApp,Version=v11.0.AssemblyAttributes.cs
- common.GlobalUsings.g.cs
-Assertions.cs
-Assertions.Enumerable.cs
-Assertions.Gen.cs
-Assertions.Option.cs
-Assertions.Result.cs
+obj/Debug/net11.0/.NETCoreApp,Version=v11.0.AssemblyAttributes.cs
 Enumerable.cs
 Error.cs
 Gen.cs
@@ -92,18 +85,12 @@ Unit.cs
 Microsoft.NETCore.App.Ref
 
 [metadataReferences]
-<NUGET>/
- cscheck/4.6.2/lib/net8.0/CsCheck.dll
- tunit.assertions/1.43.11/lib/net10.0/TUnit.Assertions.dll
+<NUGET>/cscheck/5.0.0-rc1/lib/net10.0/CsCheck.dll
 
 [analyzerReferences]
 <NETSDK>/Sdks/Microsoft.NET.Sdk/analyzers/
  Microsoft.CodeAnalysis.CSharp.NetAnalyzers.dll
  Microsoft.CodeAnalysis.NetAnalyzers.dll
-<NUGET>/tunit.assertions/1.43.11/analyzers/dotnet/cs/
- TUnit.Assertions.Analyzers.CodeFixers.dll
- TUnit.Assertions.Analyzers.dll
- TUnit.Assertions.SourceGenerator.dll
 
 [sdkAnalyzerConfigPolicy]
 Microsoft.NET.Sdk/analyzers|AnalysisLevelSuffix=all

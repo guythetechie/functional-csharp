@@ -41,7 +41,7 @@ public static class MapperGenerator
 
     public static Gen<Func<int, string>> IntToString { get; } =
         Gen.OneOf(// Convert the integer to a string in a given base
-                  from @base in Gen.OneOfConst(2, 8, 10, 16)
+                  from @base in Gen.OneOf(2, 8, 10, 16)
                   select (Func<int, string>)(i => Convert.ToString(i, @base)),
                   // Add a prefix and suffix to the integer when converting to a string
                   from prefix in Gen.Char.AlphaNumeric.Array[1, 10]

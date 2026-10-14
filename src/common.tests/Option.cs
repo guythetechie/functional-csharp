@@ -244,9 +244,9 @@ public class OptionT_Equality_Tests
         var gen = from x1 in Generator.Object
                   from x2 in Generator.Object
                   let optionGenerator =
-                    Gen.OneOfConst(Option.Some(x1),
-                                   Option.Some(x2),
-                                   Option.None)
+                    Gen.OneOf(Option.Some(x1),
+                              Option.Some(x2),
+                              Option.None)
                   from option1 in optionGenerator
                   from option2 in optionGenerator
                   select (option1, option2);
@@ -271,9 +271,9 @@ public class OptionT_Equality_Tests
         var gen = from x1 in Generator.Object
                   from x2 in Generator.Object
                   let optionGenerator =
-                    Gen.OneOfConst(Option.Some(x1),
-                                   Option.Some(x2),
-                                   Option.None)
+                    Gen.OneOf(Option.Some(x1),
+                              Option.Some(x2),
+                              Option.None)
                   from option1 in optionGenerator
                   from option2 in optionGenerator
                   from option3 in optionGenerator

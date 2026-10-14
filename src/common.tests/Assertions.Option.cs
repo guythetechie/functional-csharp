@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using TUnit.Assertions.Core;
 using TUnit.Assertions.Sources;
 
-namespace common;
+namespace common.tests;
 
 public sealed class OptionIsSomeAssertion<T>(AssertionContext<Option<T>> context)
     : MappedValueAssertion<Option<T>, T>(context,
@@ -47,13 +47,17 @@ public static class OptionAssertionExtensions
     {
         public OptionIsSomeAssertion<T> IsSome()
         {
+#pragma warning disable CA1305 // Specify IFormatProvider
             source.Context.ExpressionBuilder.Append($".IsSome()");
+#pragma warning restore CA1305 // Specify IFormatProvider
             return new(source.Context);
         }
 
         public OptionIsNoneAssertion<T> IsNone()
         {
+#pragma warning disable CA1305 // Specify IFormatProvider
             source.Context.ExpressionBuilder.Append($".IsNone()");
+#pragma warning restore CA1305 // Specify IFormatProvider
             return new(source.Context);
         }
     }

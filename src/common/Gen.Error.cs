@@ -16,9 +16,9 @@ public static class ErrorGenerator
         where messages.Count > 0
         from exceptions in
             Generator.Traverse(messages,
-                               message => Gen.OneOfConst<Exception>(new InvalidOperationException(message),
-                                                         new ArgumentException(message),
-                                                         new ArgumentNullException(message)))
+                               message => Gen.OneOf<Exception>(new InvalidOperationException(message),
+                                                               new ArgumentException(message),
+                                                               new ArgumentNullException(message)))
         select Error.From([.. exceptions]);
 
     public static Gen<Error> Any { get; } =

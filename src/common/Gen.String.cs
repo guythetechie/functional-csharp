@@ -13,7 +13,7 @@ public static class StringGenerator
         select str;
 
     public static Gen<string> Whitespace { get; } =
-        from chars in Gen.OneOfConst(' ', '\t', '\n', '\r', '\f', '\v').Array
+        from chars in Gen.OneOf(' ', '\t', '\n', '\r', '\f', '\v').Array
         select new string([.. chars]);
 
     public static Gen<string?> NullOrWhitespace { get; } =
@@ -38,13 +38,13 @@ public static class StringGenerator
         select guid.ToString();
 
     public static Gen<IEqualityComparer<string>> Comparer { get; } =
-        Gen.OneOfConst<IEqualityComparer<string>>(EqualityComparer<string>.Default,
-                                                  StringComparer.Ordinal,
-                                                  StringComparer.OrdinalIgnoreCase,
-                                                  StringComparer.CurrentCulture,
-                                                  StringComparer.CurrentCultureIgnoreCase,
-                                                  StringComparer.InvariantCulture,
-                                                  StringComparer.InvariantCultureIgnoreCase);
+        Gen.OneOf<IEqualityComparer<string>>(EqualityComparer<string>.Default,
+                                             StringComparer.Ordinal,
+                                             StringComparer.OrdinalIgnoreCase,
+                                             StringComparer.CurrentCulture,
+                                             StringComparer.CurrentCultureIgnoreCase,
+                                             StringComparer.InvariantCulture,
+                                             StringComparer.InvariantCultureIgnoreCase);
 
     public static Gen<string> AlphaNumeric { get; } =
         from str in Gen.String.AlphaNumeric
@@ -61,7 +61,7 @@ public static class StringGenerator
     public static Gen<string> RandomizeCapitalization(string input) =>
         from characters in
             Generator.Traverse(input,
-                               character => Gen.OneOfConst(char.ToUpperInvariant(character),
-                                                           char.ToLowerInvariant(character)))
+                               character => Gen.OneOf(char.ToUpperInvariant(character),
+                                                      char.ToLowerInvariant(character)))
         select new string([.. characters]);
 }

@@ -2,7 +2,7 @@ using System.Threading.Tasks;
 using TUnit.Assertions.Core;
 using TUnit.Assertions.Sources;
 
-namespace common;
+namespace common.tests;
 
 public sealed class ResultIsSuccessAssertion<T>(AssertionContext<Result<T>> context)
     : MappedValueAssertion<Result<T>, T>(context,

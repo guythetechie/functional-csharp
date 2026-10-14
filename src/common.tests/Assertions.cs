@@ -4,7 +4,7 @@ using System.Threading.Tasks;
 using TUnit.Assertions.Core;
 using TUnit.Assertions.Sources;
 
-namespace common;
+namespace common.tests;
 
 public abstract class MappedValueAssertion<TSource, TMapped>(AssertionContext<TSource> context, Func<TSource, ValueTask<Result<TMapped>>> mapper) : Assertion<TSource>(context)
 {
@@ -14,7 +14,9 @@ public abstract class MappedValueAssertion<TSource, TMapped>(AssertionContext<TS
 
     protected ValueAssertion<TMapped> GetMappedAssertion([CallerMemberName] string expressionSegment = "")
     {
+#pragma warning disable CA1305 // Specify IFormatProvider
         Context.ExpressionBuilder.Append($".{expressionSegment}");
+#pragma warning restore CA1305 // Specify IFormatProvider
 
         return new TAssertion<TMapped>(Context.Map(async _ =>
         {

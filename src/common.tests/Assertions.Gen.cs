@@ -5,7 +5,7 @@ using CsCheck;
 using TUnit.Assertions.Core;
 using TUnit.Assertions.Sources;
 
-namespace common;
+namespace common.tests;
 
 public sealed class GenGeneratesValueSatisfyingAssertion<T>(AssertionContext<Gen<T>> context, Func<T, bool> predicate, int attempts)
     : MappedValueAssertion<Gen<T>, T>(context,
@@ -38,7 +38,9 @@ public static class GenAssertionExtensions
     {
         public GenGeneratesValueSatisfyingAssertion<T> GeneratesValueSatisfying(Func<T, bool> predicate, int attempts = 1000, [CallerArgumentExpression(nameof(predicate))] string? predicateExpression = null)
         {
+#pragma warning disable CA1305 // Specify IFormatProvider
             source.Context.ExpressionBuilder.Append($".GeneratesValueSatisfying({predicateExpression})");
+#pragma warning restore CA1305 // Specify IFormatProvider
             return new(source.Context, predicate, attempts);
         }
     }

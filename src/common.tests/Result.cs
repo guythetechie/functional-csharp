@@ -124,10 +124,10 @@ public class ResultT_Equality_Tests
                   from x2 in Generator.Object
                   from error2 in ErrorGenerator.Any
                   let resultGenerator =
-                    Gen.OneOfConst(new Result<object>(new Result<object>.Success(x1)),
-                                   new Result<object>(error1),
-                                   new Result<object>(new Result<object>.Success(x2)),
-                                   new Result<object>(error2))
+                    Gen.OneOf(new Result<object>(new Result<object>.Success(x1)),
+                              new Result<object>(error1),
+                              new Result<object>(new Result<object>.Success(x2)),
+                              new Result<object>(error2))
                   from result1 in resultGenerator
                   from result2 in resultGenerator
                   select (result1, result2);
@@ -154,10 +154,10 @@ public class ResultT_Equality_Tests
                   from x2 in Generator.Object
                   from error2 in ErrorGenerator.Any
                   let resultGenerator =
-                    Gen.OneOfConst(new Result<object>(new Result<object>.Success(x1)),
-                                   new Result<object>(error1),
-                                   new Result<object>(new Result<object>.Success(x2)),
-                                   new Result<object>(error2))
+                    Gen.OneOf(new Result<object>(new Result<object>.Success(x1)),
+                              new Result<object>(error1),
+                              new Result<object>(new Result<object>.Success(x2)),
+                              new Result<object>(error2))
                   from result1 in resultGenerator
                   from result2 in resultGenerator
                   from result3 in resultGenerator
