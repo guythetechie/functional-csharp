@@ -51,6 +51,37 @@ public static class EnumerableExtensions
     }
 
     /// <summary>
+    /// Returns the last element as an option.
+    /// </summary>
+    /// <returns><see cref="Option.Some{T}(T)"/> with the last element if the sequence has elements, otherwise <see cref="Option.None"/>.</returns>
+    public static Option<T> LastOrNone<T>(this IEnumerable<T> source)
+    {
+        using var enumerator = source.GetEnumerator();
+
+        if (enumerator.MoveNext() is false)
+        {
+            return Option.None;
+        }
+
+        var last = enumerator.Current;
+
+        while (enumerator.MoveNext())
+        {
+            last = enumerator.Current;
+        }
+
+        return Option.Some(last);
+    }
+
+    /// <summary>
+    /// Returns the last element where <paramref name="predicate"/> is true as an option.
+    /// </summary>
+    /// <returns><see cref="Option.Some{T}(T)"/> with the last matching element if one matches the predicate, otherwise <see cref="Option.None"/>.</returns>
+    public static Option<T> LastOrNone<T>(this IEnumerable<T> source, Func<T, bool> predicate) =>
+        source.Where(predicate)
+              .LastOrNone();
+
+    /// <summary>
     /// Filters and transforms elements using <paramref name="selector"/>.
     /// </summary>
     /// <returns>A sequence containing only the values where <paramref name="selector"/> returned <see cref="Option.Some{T}(T)"/>.</returns>

@@ -144,6 +144,174 @@ public class Enumerable_SingleOrNone_Tests
     }
 }
 
+public class Enumerable_LastOrNone_Tests
+{
+    [Test]
+    public async Task Empty_sequence_returns_none()
+    {
+        // Arrange
+        var source = Enumerable.Empty<int>();
+
+        // Act
+        var result = source.LastOrNone();
+
+        // Assert
+        await Assert.That(result)
+                    .IsNone();
+    }
+
+    [Test]
+    public async Task Non_empty_sequence_returns_last_item()
+    {
+        var gen = from last in Generator.Object
+                  from prefix in Generator.Object.Array
+                  let source = prefix.Append(last)
+                  select (last, source);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (last, source) = tuple;
+
+            // Act
+            var result = source.LastOrNone();
+
+            // Assert
+            await Assert.That(result)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(last);
+        });
+    }
+
+    [Test]
+    public async Task Single_item_returns_some()
+    {
+        var gen = Generator.Object;
+
+        await gen.SampleAsync(async value =>
+        {
+            // Arrange
+            var source = Enumerable.Repeat(value, 1);
+
+            // Act
+            var result = source.LastOrNone();
+
+            // Assert
+            await Assert.That(result)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(value);
+        });
+    }
+
+    [Test]
+    public async Task Default_value_returns_some()
+    {
+        var gen = Gen.Int.Array;
+
+        await gen.SampleAsync(async array =>
+        {
+            // Arrange
+            var source = array.Append(default);
+
+            // Act
+            var result = source.LastOrNone();
+
+            // Assert
+            await Assert.That(result)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(default);
+        });
+    }
+}
+
+public class Enumerable_LastOrNone_WithPredicate_Tests
+{
+    [Test]
+    public async Task Empty_sequence_returns_none()
+    {
+        // Arrange
+        var source = Enumerable.Empty<int>();
+
+        // Act
+        var result = source.LastOrNone(value => value > 0);
+
+        // Assert
+        await Assert.That(result)
+                    .IsNone();
+    }
+
+    [Test]
+    public async Task No_matching_item_returns_none()
+    {
+        var gen = Generator.Object.Array;
+
+        await gen.SampleAsync(async source =>
+        {
+            // Act
+            var result = source.LastOrNone(_ => false);
+
+            // Assert
+            await Assert.That(result)
+                        .IsNone();
+        });
+    }
+
+    [Test]
+    public async Task Is_equivalent_to_Where_then_Reverse_then_Head()
+    {
+        var gen = from source in Generator.Object.Array
+                  from predicate in MapperGenerator.ObjectPredicate
+                  select (source, predicate);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (source, predicate) = tuple;
+
+            // Act
+            var result1 = source.LastOrNone(predicate);
+
+            var result2 = source.Where(predicate)
+                                .Reverse()
+                                .Head();
+
+            // Assert
+            await Assert.That(result1)
+                        .IsEqualTo(result2);
+        });
+    }
+
+    [Test]
+    public async Task Matching_default_value_returns_some()
+    {
+        var gen = from array in Gen.Int.Array
+                  from predicate in
+                    from predicate in MapperGenerator.IntPredicate
+                    where predicate(default)
+                    select predicate
+                  select (array, predicate);
+
+        await gen.SampleAsync(async tuple =>
+        {
+            // Arrange
+            var (array, predicate) = tuple;
+            var source = array.Append(default);
+
+            // Act
+            var result = source.LastOrNone(predicate);
+
+            // Assert
+            await Assert.That(result)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(default);
+        });
+    }
+}
+
 public class Enumerable_Choose_Tests()
 {
     [Test]
