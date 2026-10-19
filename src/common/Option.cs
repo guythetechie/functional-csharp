@@ -116,6 +116,14 @@ public static class Option
     /// </summary>
     public static None None { get; }
 
+    public static Option<T> From<T>(T? value) where T : class =>
+        value is null ? None : Some(value);
+
+    public static Option<T> From<T>(T? value) where T : struct =>
+        value.HasValue
+         ? Some(value.Value)
+         : None;
+
     /// <summary>
     /// Returns the original option when it is Some and <paramref name="predicate"/> returns true; otherwise returns <see cref="common.None"/>.
     /// </summary>

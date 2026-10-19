@@ -318,6 +318,76 @@ public class Option_Some_Tests
     }
 }
 
+public class Option_From_ReferenceType_Tests
+{
+    [Test]
+    public async Task Non_null_returns_an_option_in_the_some_state()
+    {
+        var gen = Gen.String;
+
+        await gen.SampleAsync(async x =>
+        {
+            // Arrange
+            string? nullable = x;
+
+            // Act
+            var option = Option.From(nullable);
+
+            // Assert
+            await Assert.That(option)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(x);
+        });
+    }
+
+    [Test]
+    public async Task Null_returns_an_option_in_the_none_state()
+    {
+        // Act
+        var option = Option.From((string?)null);
+
+        // Assert
+        await Assert.That(option)
+                    .IsNone();
+    }
+}
+
+public class Option_From_NullableValueType_Tests
+{
+    [Test]
+    public async Task Value_returns_an_option_in_the_some_state()
+    {
+        var gen = Gen.Int;
+
+        await gen.SampleAsync(async x =>
+        {
+            // Arrange
+            int? nullable = x;
+
+            // Act
+            var option = Option.From(nullable);
+
+            // Assert
+            await Assert.That(option)
+                        .IsSome()
+                        .WhoseValue
+                        .IsEqualTo(x);
+        });
+    }
+
+    [Test]
+    public async Task Null_returns_an_option_in_the_none_state()
+    {
+        // Act
+        var option = Option.From((int?)null);
+
+        // Assert
+        await Assert.That(option)
+                    .IsNone();
+    }
+}
+
 public class Option_Where_Tests()
 {
     [Test]
