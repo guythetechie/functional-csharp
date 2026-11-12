@@ -413,3 +413,6 @@ $RECYCLE.BIN/
 
 # Windows shortcuts
 *.lnk
+
+# C# Dev Kit.
+*.lscache

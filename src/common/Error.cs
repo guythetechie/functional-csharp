@@ -80,7 +80,7 @@ public sealed record Error
 
         Exceptions.Select(exception => $"{exception.GetType().Name}: {exception.Message}")
                   .Order()
-                  .Iter(text => builder.AppendLine(text)); 
+                  .Iter(text => builder.AppendLine(text));
 
         return builder.ToString().Trim();
     }

@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net11.0</TargetFramework>
+    <LangVersion>preview</LangVersion>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <NoWarn>CA1515</NoWarn>
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <OutputType>Exe</OutputType>
+    <InvariantGlobalization>True</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../common/common.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit" Version="1.83.0" />
+    <PackageReference Include="TUnit.Assertions" Version="1.83.0" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,8 @@
+{
+    "id": "github",
+    "version": "1.0.0",
+    "name": "github",
+    "dependsOn": {
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    }
+}
