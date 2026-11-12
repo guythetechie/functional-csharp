@@ -53,6 +53,8 @@ public static class Generator
                   from x in Gen.UShort
                   select (object)x);
 
+    public static Gen<object?> NullObject { get; } = Gen.Const((object?)null);
+
     public static Gen<ImmutableArray<T>> SubArrayOf<T>(ICollection<T> collection) =>
         SubArrayOf(collection, minimumLength: 0, maximumLength: collection.Count);
 
@@ -118,7 +120,8 @@ public static class Generator
     }
 
     public static Gen<ImmutableArray<T>> ArrayOf<T>(this Gen<T> gen) =>
-        gen.ArrayOf(minimumLength: 0, maximumLength: 10);
+        from array in gen.Array
+        select array.ToImmutableArray();
 
     public static Gen<ImmutableArray<T>> ArrayOf<T>(this Gen<T> gen, int length) =>
         gen.ArrayOf(minimumLength: length, maximumLength: length);

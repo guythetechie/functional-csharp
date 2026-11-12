@@ -1,11 +1,14 @@
 using CsCheck;
 using System;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace common;
 
 public static class MapperGenerator
 {
+    public static Func<T, T> Identity<T>() => x => x;
+
     public static Gen<Func<int, int>> IntToInt { get; } =
         Gen.OneOf(// Add x to the integer, ensuring that the output doesn't exceed the bounds of an int
                   from x in Gen.Int
@@ -60,13 +63,29 @@ public static class MapperGenerator
                   from f in IntToString
                   from g in StringToInt
                   select new Func<object, object>(x => f(g(x.ToString()))));
-                  
+
+    public static Gen<Func<object, ValueTask<object>>> ObjectToAsyncObject { get; } =
+        from f in ObjectToObject
+        select new Func<object, ValueTask<object>>(async value =>
+        {
+            await Task.Yield();
+            return f(value);
+        });
+
     public static Gen<Func<object, Option<object>>> ObjectToOption { get; } =
         from predicate in ObjectPredicate
         from f in ObjectToObject
         select new Func<object, Option<object>>(x => predicate(x)
                                                         ? Option.Some(f(x))
                                                         : Option.None);
+
+    public static Gen<Func<object, ValueTask<Option<object>>>> ObjectToAsyncOption { get; } =
+        from f in ObjectToOption
+        select new Func<object, ValueTask<Option<object>>>(async x =>
+        {
+            await Task.Yield();
+            return f(x);
+        });
 
     public static Gen<Func<Error, Error>> ErrorToError { get; } =
         from updatedError in ErrorGenerator.Any
@@ -83,4 +102,26 @@ public static class MapperGenerator
         select new Func<object, Result<object>>(x => predicate(x)
                                                         ? Result.Success(f(x))
                                                         : Result.Error<object>(error + Error.From($"Predicate failed for {x}")));
+
+    public static Gen<Func<object, ValueTask<Result<object>>>> ObjectToAsyncResult { get; } =
+        from f in ObjectToResult
+        select new Func<object, ValueTask<Result<object>>>(async x =>
+        {
+            await Task.Yield();
+            return f(x);
+        });
+
+    public static Gen<Func<Error, Result<object>>> ErrorToResult { get; } =
+        Gen.OneOf(from f in ErrorToObject
+                  select new Func<Error, Result<object>>(x => Result.Success(f(x))),
+                  from f in ErrorToError
+                  select new Func<Error, Result<object>>(x => Result.Error<object>(f(x))));
+
+    public static Gen<Func<Error, ValueTask<Result<object>>>> ErrorToAsyncResult { get; } =
+        from f in ErrorToResult
+        select new Func<Error, ValueTask<Result<object>>>(async x =>
+        {
+            await Task.Yield();
+            return f(x);
+        });
 }
